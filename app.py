@@ -19,11 +19,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# لاگ تمام درخواست‌ها
-import logging
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.DEBUG)
-
 app = Flask(__name__)
 
 # ==================== تابع نصب خودکار پکیج‌ها ====================
@@ -411,7 +406,7 @@ def index():
         try:
             # لاگ تمام داده‌های دریافتی
             logger.debug(f"📋 فرم داده‌ها: {dict(request.form)}")
-            logger.debug(f"📎 فایل‌ها: {request.files.keys()}")
+            logger.debug(f"📎 فایل‌ها: {list(request.files.keys())}")
             
             # دریافت داده‌ها از فرم
             platform = request.form.get('platform', 'rubika')
@@ -426,38 +421,41 @@ def index():
                 return render_template('result.html', 
                     result={'success': False, 'message': '❌ لطفاً توکن را وارد کنید', 'logs': ''})
             
-            # دریافت کد
+            # ===== دریافت کد =====
             code_content = ""
             
             if code_type == 'file':
                 logger.debug("📂 دریافت کد از فایل...")
                 
-                if 'code_file' not in request.files:
-                    logger.warning("❌ فایل ارسال نشده است")
-                    return render_template('result.html', 
-                        result={'success': False, 'message': '❌ لطفاً یک فایل انتخاب کنید', 'logs': ''})
+                # ===== روش ۱: دریافت از فایل =====
+                if 'code_file' in request.files:
+                    file = request.files['code_file']
+                    if file.filename != '':
+                        logger.info(f"📄 دریافت فایل: {file.filename}")
+                        file_content = file.read()
+                        
+                        if len(file_content) > MAX_CODE_SIZE:
+                            logger.warning(f"❌ حجم فایل بیش از حد مجاز: {len(file_content)} بایت")
+                            return render_template('result.html', 
+                                result={'success': False, 'message': f'❌ حجم فایل بیشتر از {MAX_CODE_SIZE//1024} کیلوبایت است', 'logs': ''})
+                        
+                        try:
+                            code_content = file_content.decode('utf-8', errors='ignore')
+                            logger.info(f"✅ کد از فایل دریافت شد: {len(code_content)} کاراکتر")
+                        except Exception as e:
+                            logger.error(f"❌ خطا در خواندن فایل: {e}")
+                            return render_template('result.html', 
+                                result={'success': False, 'message': f'❌ خطا در خواندن فایل: {str(e)}', 'logs': ''})
                 
-                file = request.files['code_file']
-                if file.filename == '':
-                    logger.warning("❌ نام فایل خالی است")
-                    return render_template('result.html', 
-                        result={'success': False, 'message': '❌ لطفاً یک فایل انتخاب کنید', 'logs': ''})
-                
-                logger.info(f"📄 دریافت فایل: {file.filename}")
-                file_content = file.read()
-                
-                if len(file_content) > MAX_CODE_SIZE:
-                    logger.warning(f"❌ حجم فایل بیش از حد مجاز: {len(file_content)} بایت")
-                    return render_template('result.html', 
-                        result={'success': False, 'message': f'❌ حجم فایل بیشتر از {MAX_CODE_SIZE//1024} کیلوبایت است', 'logs': ''})
-                
-                try:
-                    code_content = file_content.decode('utf-8', errors='ignore')
-                    logger.info(f"✅ کد از فایل دریافت شد: {len(code_content)} کاراکتر")
-                except Exception as e:
-                    logger.error(f"❌ خطا در خواندن فایل: {e}")
-                    return render_template('result.html', 
-                        result={'success': False, 'message': f'❌ خطا در خواندن فایل: {str(e)}', 'logs': ''})
+                # ===== روش ۲: دریافت از code_text (اگر فایل ارسال نشده) =====
+                if not code_content:
+                    code_content = request.form.get('code_text', '').strip()
+                    if code_content:
+                        logger.info(f"✅ کد از متن دریافت شد (روش جایگزین): {len(code_content)} کاراکتر")
+                    else:
+                        logger.warning("❌ نه فایل و نه متن ارسال نشده است")
+                        return render_template('result.html', 
+                            result={'success': False, 'message': '❌ لطفاً یک فایل انتخاب کنید یا کد را وارد کنید', 'logs': ''})
                 
             else:  # text
                 logger.debug("✏️ دریافت کد از متن...")
