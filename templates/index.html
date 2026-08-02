@@ -369,7 +369,6 @@
     </div>
 
     <script>
-        // ===== کد جاوااسکریپت کامل =====
         (function() {
             'use strict';
 
@@ -503,9 +502,6 @@
                     return;
                 }
 
-                let code = '';
-                let codeSource = '';
-
                 if (codeTypeVal === 'file') {
                     if (!fileInput.files || fileInput.files.length === 0) {
                         showAlert('❌ لطفاً یک فایل انتخاب کنید!', 'error');
@@ -516,63 +512,63 @@
                         showAlert('❌ حجم فایل بیشتر از ۱۰۰ کیلوبایت است!', 'error');
                         return;
                     }
-                    codeSource = 'فایل: ' + file.name;
                     const reader = new FileReader();
                     reader.onload = function(event) {
-                        code = event.target.result;
-                        sendToServer(selectedPlatform, codeTypeVal, token, code, codeSource);
+                        const code = event.target.result;
+                        sendToServer(selectedPlatform, codeTypeVal, token, code);
                     };
                     reader.onerror = function() {
                         showAlert('❌ خطا در خواندن فایل!', 'error');
                     };
                     reader.readAsText(file, 'UTF-8');
-                    return;
                 } else {
-                    code = codeText.value.trim();
-                    codeSource = 'ورودی متنی';
+                    const code = codeText.value.trim();
                     if (!code) {
                         showAlert('❌ لطفاً کد را وارد کنید!', 'error');
                         return;
                     }
-                    sendToServer(selectedPlatform, codeTypeVal, token, code, codeSource);
+                    sendToServer(selectedPlatform, codeTypeVal, token, code);
                 }
             });
 
-            async function sendToServer(platform, codeType, token, code, source) {
+            async function sendToServer(platform, codeType, token, code) {
                 setLoading(true);
 
                 try {
+                    const formData = new FormData();
+                    formData.append('platform', platform);
+                    formData.append('code_type', codeType);
+                    formData.append('token', token);
+                    formData.append('code_text', code);
+
                     const response = await fetch('/', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                        },
-                        body: new URLSearchParams({
-                            platform: platform,
-                            code_type: codeType,
-                            token: token,
-                            code_text: code
-                        })
+                        body: formData
                     });
 
                     const html = await response.text();
-                    const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = html;
                     
-                    const resultContainer = tempDiv.querySelector('.result-container');
-                    if (resultContainer) {
-                        document.getElementById('resultContainer').innerHTML = resultContainer.innerHTML;
-                        document.getElementById('resultContainer').classList.add('show');
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    
+                    const resultContainerNew = doc.querySelector('.result-container');
+                    if (resultContainerNew) {
+                        const currentResultContainer = document.getElementById('resultContainer');
+                        currentResultContainer.innerHTML = resultContainerNew.innerHTML;
+                        currentResultContainer.classList.add('show');
                     } else {
-                        const alertDiv = tempDiv.querySelector('.alert');
+                        const alertDiv = doc.querySelector('.alert');
                         if (alertDiv) {
                             document.getElementById('alertMessage').innerHTML = alertDiv.innerHTML;
                             document.getElementById('alertMessage').className = alertDiv.className;
+                        } else {
+                            showAlert('❌ خطا در پردازش درخواست!', 'error');
                         }
                     }
 
                 } catch (error) {
                     showAlert('❌ خطا در ارتباط با سرور: ' + error.message, 'error');
+                    console.error('Error:', error);
                 } finally {
                     setLoading(false);
                 }
