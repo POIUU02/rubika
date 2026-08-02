@@ -193,30 +193,24 @@ def execute_python_code(code, token, platform):
         shutil.rmtree(temp_dir, ignore_errors=True)
         return {'success': False, 'message': f'❌ خطا در ایجاد فایل: {str(e)}', 'logs': str(e), 'error': str(e)}
     
-    # ===== نصب پکیج rubka (نه rubika) =====
+    # ===== نصب پکیج rubika (پکیج اصلی) =====
     install_logs = ""
-    platform_packages = {
-        'rubika': 'rubka',  # تغییر از rubika به rubka
-        'telegram': 'python-telegram-bot'
-    }
     
-    package_to_install = platform_packages.get(platform)
-    if package_to_install:
-        try:
-            logger.info(f"📦 نصب پکیج: {package_to_install}")
-            install_result = subprocess.run(
-                [sys.executable, "-m", "pip", "install", package_to_install, "--quiet"],
-                capture_output=True, text=True, timeout=60
-            )
-            if install_result.returncode != 0:
-                install_logs = f"⚠️ خطا در نصب {package_to_install}: {install_result.stderr[:200]}\n"
-                logger.warning(install_logs)
-            else:
-                install_logs = f"✅ {package_to_install} نصب شد.\n"
-                logger.info(f"✅ {package_to_install} نصب شد")
-        except Exception as e:
-            install_logs = f"⚠️ خطا در نصب: {str(e)}\n"
-            logger.error(install_logs)
+    try:
+        logger.info(f"📦 نصب پکیج: rubika")
+        install_result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "rubika", "--quiet"],
+            capture_output=True, text=True, timeout=60
+        )
+        if install_result.returncode != 0:
+            install_logs = f"⚠️ خطا در نصب rubika: {install_result.stderr[:200]}\n"
+            logger.warning(install_logs)
+        else:
+            install_logs = f"✅ rubika نصب شد.\n"
+            logger.info(f"✅ rubika نصب شد")
+    except Exception as e:
+        install_logs = f"⚠️ خطا در نصب: {str(e)}\n"
+        logger.error(install_logs)
     
     # اجرای کد
     output = ""
