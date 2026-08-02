@@ -37,7 +37,6 @@ def auto_install_packages():
             except Exception as e:
                 print(f"❌ خطا در نصب {pkg}: {e}")
 
-# اجرای نصب خودکار
 auto_install_packages()
 
 # ==================== ایمپورت پکیج‌ها بعد از نصب ====================
@@ -46,85 +45,14 @@ try:
 except ImportError:
     print("⚠️ psutil نصب نشد. برخی قابلیت‌ها محدود می‌شوند.")
 
-# ==================== ایجاد خودکار فایل‌های پیکربندی ====================
-def create_config_files():
-    """ایجاد خودکار فایل‌های پیکربندی در صورت نبودن"""
-    files = {
-        'requirements.txt': '''flask==2.3.3
-requests==2.31.0
-gunicorn==21.2.0
-psutil==5.9.6''',
-        
-        'runtime.txt': 'python-3.11.5',
-        
-        'Procfile': 'web: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120',
-        
-        '.env.example': '''PORT=8080
-TOKEN=your_bot_token_here
-MASTER_ID=your_master_id
-REPORT_CHAT_ID=your_report_chat_id'''
-    }
-    
-    for filename, content in files.items():
-        if not os.path.exists(filename):
-            try:
-                with open(filename, 'w', encoding='utf-8') as f:
-                    f.write(content)
-                print(f"✅ فایل {filename} ایجاد شد.")
-            except Exception as e:
-                print(f"⚠️ خطا در ایجاد {filename}: {e}")
+# ==================== تنظیمات پیش‌فرض (بدون نیاز به input) ====================
+PORT = int(os.environ.get('PORT', 8080))
+MAX_CODE_SIZE = 100 * 1024  # 100 کیلوبایت
+EXECUTION_TIMEOUT = 60  # 60 ثانیه
+MASTER_ID = os.environ.get('MASTER_ID', '')
+REPORT_CHAT_ID = os.environ.get('REPORT_CHAT_ID', '')
 
-create_config_files()
-
-# ==================== دریافت تنظیمات از کاربر ====================
-def load_config():
-    """بارگذاری تنظیمات از فایل یا دریافت از کاربر"""
-    config_file = 'config.json'
-    
-    # اگر فایل تنظیمات وجود داشت، بارگذاری کن
-    if os.path.exists(config_file):
-        try:
-            with open(config_file, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-            print("✅ تنظیمات قبلی بارگذاری شد.")
-            return config
-        except:
-            print("⚠️ خطا در خواندن تنظیمات. ایجاد تنظیمات جدید...")
-    
-    # دریافت از کاربر
-    print("\n" + "="*60)
-    print("🤖 راه‌اندازی اولیه ربات رانر")
-    print("="*60)
-    print("💡 برای استفاده از مقدار پیش‌فرض، Enter بزنید.\n")
-    
-    config = {
-        'port': input("🌐 پورت (پیش‌فرض 8080): ") or '8080',
-        'max_size': input("📄 حداکثر حجم فایل بر حسب کیلوبایت (پیش‌فرض 100): ") or '100',
-        'timeout': input("⏱️ زمان اجرا بر حسب ثانیه (پیش‌فرض 60): ") or '60',
-        'master_id': input("👑 آیدی ارباب (اختیاری - برای روبیکا): ") or '',
-        'report_chat_id': input("📨 گپ گزارش (اختیاری - برای روبیکا): ") or ''
-    }
-    
-    # ذخیره تنظیمات
-    try:
-        with open(config_file, 'w', encoding='utf-8') as f:
-            json.dump(config, f, indent=4, ensure_ascii=False)
-        print("\n✅ تنظیمات ذخیره شد!")
-    except Exception as e:
-        print(f"⚠️ خطا در ذخیره تنظیمات: {e}")
-    
-    return config
-
-# بارگذاری تنظیمات
-config = load_config()
-
-# ==================== تنظیمات اصلی ====================
-PORT = int(os.environ.get('PORT', config.get('port', 8080)))
-MAX_CODE_SIZE = int(config.get('max_size', 100)) * 1024  # تبدیل به بایت
-EXECUTION_TIMEOUT = int(config.get('timeout', 60))
-MASTER_ID = config.get('master_id', '')
-REPORT_CHAT_ID = config.get('report_chat_id', '')
-
+# ==================== تنظیمات ====================
 print(f"\n🚀 تنظیمات اعمال شد:")
 print(f"   📡 پورت: {PORT}")
 print(f"   📄 حداکثر حجم: {MAX_CODE_SIZE//1024} KB")
@@ -167,7 +95,6 @@ def check_telegram_token(token):
 
 def check_whatsapp_token(token):
     """بررسی اعتبار توکن واتساپ (ساده)"""
-    # واتساپ معمولاً طولانی‌تره
     return len(token) > 20
 
 # ==================== توابع امنیتی ====================
@@ -200,7 +127,6 @@ def inject_token_to_code(code, token, platform):
     modifications = []
     modified_code = code
     
-    # لیست متغیرهای احتمالی برای توکن
     token_vars = [
         'YOUR_TOKEN', 'your_token', 'TOKEN', 'token', 
         'BOT_TOKEN', 'bot_token', 'API_TOKEN', 'api_token',
@@ -208,16 +134,12 @@ def inject_token_to_code(code, token, platform):
         'ROBOT_TOKEN', 'robot_token'
     ]
     
-    # روش ۱: جایگزینی مستقیم
     for var in token_vars:
         if var in modified_code:
-            # جایگزینی تعریف متغیر
             modified_code = re.sub(rf'{var}\s*=\s*["\']([^"\']*)["\']', f'{var} = "{token}"', modified_code)
-            # جایگزینی استفاده مستقیم
             modified_code = re.sub(rf'\b{var}\b', f'"{token}"', modified_code)
             modifications.append(f"جایگزینی {var}")
     
-    # روش ۲: اضافه کردن در ابتدای کد (اگر هیچ تغییری نشد)
     if not modifications:
         header = f"""
 # ===== توکن به‌صورت خودکار تزریق شد =====
@@ -234,7 +156,6 @@ TOKEN = "{token}"
 def create_bot_runner_file(code, token, platform):
     """ایجاد فایل کامل ربات با کد کاربر و تنظیمات"""
     
-    # تنظیمات مخصوص هر پلتفرم
     platform_config = ""
     if platform == 'rubika':
         platform_config = f'''
@@ -272,14 +193,10 @@ os.environ["TOKEN"] = TOKEN
 # ===== اجرا =====
 if __name__ == "__main__":
     try:
-        # پیدا کردن تابع main
         if 'main' in dir():
             asyncio.run(main())
         else:
-            # اگر تابع main وجود نداشت، اجرای مستقیم
             print("⚠️ تابع main پیدا نشد. اجرای مستقیم...")
-            # اجرای کدهای اصلی
-            pass
     except KeyboardInterrupt:
         print("🛑 ربات متوقف شد")
     except Exception as e:
@@ -295,7 +212,6 @@ if __name__ == "__main__":
 def execute_python_code(code, token, platform):
     """اجرای کد پایتون در محیط ایزوله با مدیریت کامل"""
     
-    # ۱. اعتبارسنجی امنیتی
     is_valid, msg = validate_code_security(code)
     if not is_valid:
         return {
@@ -305,13 +221,9 @@ def execute_python_code(code, token, platform):
             'error': msg
         }
     
-    # ۲. تزریق توکن
     code_with_token, injection_msg = inject_token_to_code(code, token, platform)
-    
-    # ۳. ایجاد فایل کامل ربات
     full_code = create_bot_runner_file(code_with_token, token, platform)
     
-    # ۴. ذخیره در فایل موقت
     temp_dir = tempfile.mkdtemp()
     temp_path = os.path.join(temp_dir, "bot_runner.py")
     
@@ -327,7 +239,6 @@ def execute_python_code(code, token, platform):
             'error': str(e)
         }
     
-    # ۵. نصب وابستگی‌های مخصوص پلتفرم
     install_logs = ""
     platform_packages = {
         'rubika': 'rubika',
@@ -350,7 +261,6 @@ def execute_python_code(code, token, platform):
         except Exception as e:
             install_logs = f"⚠️ خطا در نصب: {str(e)}\n"
     
-    # ۶. اجرای کد
     output = ""
     success = False
     error_msg = ""
@@ -388,7 +298,6 @@ def execute_python_code(code, token, platform):
                 error_msg = "❌ کد با خطای ناشناخته متوقف شد"
             
         except subprocess.TimeoutExpired:
-            # kill process and children
             try:
                 if 'psutil' in sys.modules:
                     parent = psutil.Process(process.pid)
@@ -441,12 +350,10 @@ def index():
             code_type = request.form.get('code_type', 'file')
             token = request.form.get('token', '').strip()
             
-            # اعتبارسنجی توکن
             if not token:
                 return render_template('result.html', 
                     result={'success': False, 'message': '❌ لطفاً توکن را وارد کنید', 'logs': ''})
             
-            # دریافت کد
             if code_type == 'file':
                 if 'code_file' not in request.files:
                     return render_template('result.html', 
@@ -468,13 +375,12 @@ def index():
                     return render_template('result.html', 
                         result={'success': False, 'message': '❌ فایل معتبر نیست (فقط UTF-8 پشتیبانی می‌شود)', 'logs': ''})
                 
-            else:  # text
+            else:
                 code_content = request.form.get('code_text', '').strip()
                 if not code_content:
                     return render_template('result.html', 
                         result={'success': False, 'message': '❌ لطفاً کد را وارد کنید', 'logs': ''})
             
-            # بررسی اعتبار توکن بر اساس پلتفرم
             token_valid = False
             platform_name = ""
             
@@ -496,7 +402,6 @@ def index():
                     result={'success': False, 'message': f'❌ توکن {platform_name} نامعتبر است!', 
                            'logs': f'لطفاً توکن صحیح را از @BotFather در {platform_name} دریافت کنید'})
             
-            # اجرای کد
             result = execute_python_code(code_content, token, platform)
             
             return render_template('result.html', result=result)
@@ -511,7 +416,6 @@ def index():
 
 @app.route('/health', methods=['GET'])
 def health():
-    """بررسی وضعیت سرور"""
     return jsonify({
         'status': 'online',
         'python': sys.version,
@@ -524,17 +428,6 @@ def health():
         'timestamp': time.time()
     })
 
-@app.route('/config', methods=['GET'])
-def show_config():
-    """نمایش تنظیمات فعلی (فقط برای ادمین)"""
-    return jsonify({
-        'port': PORT,
-        'max_size_kb': MAX_CODE_SIZE // 1024,
-        'timeout': EXECUTION_TIMEOUT,
-        'master_id': MASTER_ID if MASTER_ID else 'not set',
-        'report_chat_id': REPORT_CHAT_ID if REPORT_CHAT_ID else 'not set'
-    })
-
 @app.errorhandler(404)
 def not_found(e):
     return render_template('result.html', 
@@ -544,8 +437,6 @@ def not_found(e):
 def server_error(e):
     return render_template('result.html', 
         result={'success': False, 'message': '❌ خطای داخلی سرور', 'logs': str(e)}), 500
-
-# ==================== اجرای اصلی ====================
 
 if __name__ == '__main__':
     print("\n" + "="*60)
@@ -557,7 +448,6 @@ if __name__ == '__main__':
     print(f"📱 پلتفرم‌های پشتیبانی‌شده: روبیکا، تلگرام، واتساپ")
     print("="*60)
     print("🌐 آدرس: http://localhost:" + str(PORT))
-    print("💡 برای تغییر تنظیمات، فایل config.json را ویرایش کنید.")
     print("="*60 + "\n")
     
     app.run(host='0.0.0.0', port=PORT, debug=False, threaded=True)
