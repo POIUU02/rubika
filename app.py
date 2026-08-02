@@ -91,7 +91,7 @@ def validate_code_security(code):
     return True, "✅ کد از نظر امنیتی معتبر است"
 
 def inject_token_to_code(code, token, platform):
-    """تزریق توکن به کد کاربر - نسخه اصلاح شده"""
+    """تزریق توکن به کد کاربر"""
     logger.debug(f"🔄 شروع تزریق توکن به کد (پلتفرم: {platform})...")
     
     modified_code = code
@@ -106,7 +106,6 @@ def inject_token_to_code(code, token, platform):
     
     for var in token_vars:
         if var in modified_code:
-            # الگوی ۱: var = "value" یا var = 'value'
             pattern1 = rf'{var}\s*=\s*["\']([^"\']*)["\']'
             modified_code = re.sub(pattern1, f'{var} = "{token}"', modified_code)
             modifications.append(f"جایگزینی {var}")
@@ -149,7 +148,10 @@ import time
 import sqlite3
 from datetime import datetime
 
-# ===== توکن از قبل تزریق شده =====
+# ===== تنظیمات =====
+{platform_config}
+
+# ===== کد کاربر =====
 {code}
 
 # ===== اجرا =====
@@ -191,10 +193,10 @@ def execute_python_code(code, token, platform):
         shutil.rmtree(temp_dir, ignore_errors=True)
         return {'success': False, 'message': f'❌ خطا در ایجاد فایل: {str(e)}', 'logs': str(e), 'error': str(e)}
     
-    # نصب پکیج‌های مورد نیاز
+    # ===== نصب پکیج rubka (نه rubika) =====
     install_logs = ""
     platform_packages = {
-        'rubika': 'rubika',
+        'rubika': 'rubka',  # تغییر از rubika به rubka
         'telegram': 'python-telegram-bot'
     }
     
@@ -208,6 +210,7 @@ def execute_python_code(code, token, platform):
             )
             if install_result.returncode != 0:
                 install_logs = f"⚠️ خطا در نصب {package_to_install}: {install_result.stderr[:200]}\n"
+                logger.warning(install_logs)
             else:
                 install_logs = f"✅ {package_to_install} نصب شد.\n"
                 logger.info(f"✅ {package_to_install} نصب شد")
