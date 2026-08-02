@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 راه‌انداز سریع ربات</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 40px;
+            max-width: 700px;
+            width: 100%;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+            transition: all 0.3s ease;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 35px;
+        }
+        .header h1 {
+            font-size: 36px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+        .header p {
+            color: #a0aec0;
+            font-size: 16px;
+            margin-top: 8px;
+        }
+        .form-group {
+            margin-bottom: 22px;
+        }
+        .form-group label {
+            display: block;
+            color: #e2e8f0;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.05);
+            color: #e2e8f0;
+            font-family: inherit;
+        }
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+            background: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+        }
+        .form-control::placeholder {
+            color: #718096;
+        }
+        .form-control option {
+            background: #1a1a2e;
+            color: #e2e8f0;
+        }
+        select.form-control {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23718096' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: left 16px center;
+            padding-left: 40px;
+            cursor: pointer;
+        }
+        textarea.form-control {
+            resize: vertical;
+            min-height: 150px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            direction: ltr;
+        }
+        .file-upload-wrapper {
+            border: 2px dashed rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            padding: 30px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.03);
+            position: relative;
+        }
+        .file-upload-wrapper:hover {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.05);
+        }
+        .file-upload-wrapper.dragover {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.1);
+            transform: scale(1.02);
+        }
+        .file-upload-wrapper input[type="file"] {
+            display: none;
+        }
+        .file-upload-icon {
+            font-size: 48px;
+            display: block;
+            margin-bottom: 10px;
+        }
+        .file-upload-text {
+            color: #a0aec0;
+            font-weight: 500;
+        }
+        .file-upload-text span {
+            color: #667eea;
+            font-weight: 600;
+        }
+        .file-upload-hint {
+            color: #718096;
+            font-size: 13px;
+            margin-top: 6px;
+        }
+        .file-name-display {
+            margin-top: 12px;
+            color: #667eea;
+            font-weight: 600;
+            font-size: 14px;
+            display: none;
+        }
+        .file-name-display.show {
+            display: block;
+        }
+        .btn-submit {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-submit:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+        .btn-submit:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+        .btn-submit .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top: 3px solid white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto;
+        }
+        .btn-submit.loading .spinner {
+            display: inline-block;
+        }
+        .btn-submit.loading .btn-text {
+            display: none;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .alert {
+            padding: 14px 18px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: none;
+            font-weight: 500;
+        }
+        .alert.show {
+            display: block;
+        }
+        .alert.error {
+            background: rgba(254, 215, 215, 0.15);
+            color: #fc8181;
+            border: 1px solid rgba(254, 215, 215, 0.2);
+        }
+        .alert.success {
+            background: rgba(198, 246, 213, 0.15);
+            color: #68d391;
+            border: 1px solid rgba(198, 246, 213, 0.2);
+        }
+        .result-container {
+            margin-top: 25px;
+            display: none;
+        }
+        .result-container.show {
+            display: block;
+        }
+        .result-status {
+            padding: 16px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 16px;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        .result-status.success {
+            background: rgba(198, 246, 213, 0.15);
+            color: #68d391;
+            border: 1px solid rgba(198, 246, 213, 0.2);
+        }
+        .result-status.error {
+            background: rgba(254, 215, 215, 0.15);
+            color: #fc8181;
+            border: 1px solid rgba(254, 215, 215, 0.2);
+        }
+        .logs-box {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+        }
+        .logs-box .logs-title {
+            color: #a0aec0;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .logs-box pre {
+            background: rgba(0, 0, 0, 0.5);
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 400px;
+            overflow-y: auto;
+            margin: 0;
+            direction: ltr;
+            text-align: left;
+        }
+        .log-error { color: #fc8181; }
+        .log-success { color: #68d391; }
+        .log-info { color: #63b3ed; }
+        
+        .info-box {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-top: 24px;
+            border-right: 4px solid #667eea;
+        }
+        .info-box p {
+            color: #a0aec0;
+            font-size: 13px;
+            line-height: 2;
+            margin: 0;
+        }
+        
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #667eea; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #764ba2; }
+        
+        @media (max-width: 600px) {
+            .container { padding: 24px 20px; }
+            .header h1 { font-size: 24px; }
+            .btn-submit { font-size: 16px; padding: 14px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 راه‌انداز فوری ربات</h1>
+            <p>کد ربات خود را آپلود کنید، ما اجرا می‌کنیم!</p>
+        </div>
+
+        <div class="alert" id="alertMessage"></div>
+
+        <form id="mainForm" novalidate>
+            <div class="form-group">
+                <label>📱 پلتفرم ربات:</label>
+                <select class="form-control" id="platform" name="platform" required>
+                    <option value="rubika">روبیکا</option>
+                    <option value="telegram">تلگرام</option>
+                    <option value="other">سایر</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>📄 نوع کد:</label>
+                <select class="form-control" id="codeType" name="code_type" required>
+                    <option value="file">📁 آپلود فایل (پایتون)</option>
+                    <option value="text">✏️ وارد کردن متن کد</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="fileInputGroup">
+                <div class="file-upload-wrapper" id="dropZone">
+                    <input type="file" id="fileInput" name="code_file" accept=".py,.txt">
+                    <span class="file-upload-icon">📤</span>
+                    <div class="file-upload-text">
+                        کلیک کنید یا فایل را <span>بکشید</span> اینجا
+                    </div>
+                    <div class="file-upload-hint">فایل‌های .py و .txt (حداکثر ۱۰۰ کیلوبایت)</div>
+                    <div class="file-name-display" id="fileNameDisplay">📎 <span id="fileName"></span></div>
+                </div>
+            </div>
+
+            <div class="form-group" id="textInputGroup" style="display: none;">
+                <label>✏️ کد پایتون:</label>
+                <textarea class="form-control" id="codeText" name="code_text" placeholder="# کد خود را اینجا بنویسید..." rows="8"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>🔑 توکن ربات:</label>
+                <input class="form-control" id="tokenInput" type="text" name="token" placeholder="توکن خود را از @BotFather دریافت کنید" required>
+                <small style="color: #718096; display: block; margin-top: 6px; font-size: 12px;">
+                    مثال: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
+                </small>
+            </div>
+
+            <button type="submit" class="btn-submit" id="submitBtn">
+                <span class="btn-text">🚀 بررسی و اجرا</span>
+                <span class="spinner"></span>
+            </button>
+        </form>
+
+        <div class="info-box">
+            <p>
+                ⚡ کد شما در محیط امن اجرا می‌شود.<br>
+                🔒 لاگ‌ها و خطاها به شما نمایش داده می‌شوند.<br>
+                ⏱️ زمان اجرا حداکثر ۶۰ ثانیه.
+            </p>
+        </div>
+
+        <div class="result-container" id="resultContainer">
+            <div class="result-status" id="resultStatus"></div>
+            <div class="logs-box">
+                <div class="logs-title">📋 لاگ‌های اجرا:</div>
+                <pre id="resultLogs"><span style="color: #718096;">خروجی خاصی وجود ندارد.</span></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== کد جاوااسکریپت کامل =====
+        (function() {
+            'use strict';
+
+            const form = document.getElementById('mainForm');
+            const fileInput = document.getElementById('fileInput');
+            const dropZone = document.getElementById('dropZone');
+            const fileNameDisplay = document.getElementById('fileNameDisplay');
+            const fileNameSpan = document.getElementById('fileName');
+            const codeType = document.getElementById('codeType');
+            const fileInputGroup = document.getElementById('fileInputGroup');
+            const textInputGroup = document.getElementById('textInputGroup');
+            const codeText = document.getElementById('codeText');
+            const submitBtn = document.getElementById('submitBtn');
+            const alertMsg = document.getElementById('alertMessage');
+            const resultContainer = document.getElementById('resultContainer');
+            const resultStatus = document.getElementById('resultStatus');
+            const resultLogs = document.getElementById('resultLogs');
+            const platform = document.getElementById('platform');
+
+            const MAX_FILE_SIZE = 100 * 1024;
+
+            codeType.addEventListener('change', function() {
+                if (this.value === 'file') {
+                    fileInputGroup.style.display = 'block';
+                    textInputGroup.style.display = 'none';
+                    codeText.removeAttribute('required');
+                    fileInput.setAttribute('required', 'required');
+                } else {
+                    fileInputGroup.style.display = 'none';
+                    textInputGroup.style.display = 'block';
+                    fileInput.removeAttribute('required');
+                    codeText.setAttribute('required', 'required');
+                }
+                hideAlert();
+                hideResult();
+            });
+
+            dropZone.addEventListener('click', function(e) {
+                if (e.target.tagName !== 'INPUT') {
+                    fileInput.click();
+                }
+            });
+
+            fileInput.addEventListener('change', function() {
+                if (this.files && this.files.length > 0) {
+                    const file = this.files[0];
+                    if (file.size > MAX_FILE_SIZE) {
+                        showAlert('❌ حجم فایل بیشتر از ۱۰۰ کیلوبایت است!', 'error');
+                        this.value = '';
+                        fileNameDisplay.classList.remove('show');
+                        return;
+                    }
+                    fileNameSpan.textContent = file.name;
+                    fileNameDisplay.classList.add('show');
+                    hideAlert();
+                } else {
+                    fileNameDisplay.classList.remove('show');
+                }
+            });
+
+            dropZone.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                this.classList.add('dragover');
+            });
+
+            dropZone.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                this.classList.remove('dragover');
+            });
+
+            dropZone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.classList.remove('dragover');
+                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    fileInput.files = e.dataTransfer.files;
+                    fileInput.dispatchEvent(new Event('change'));
+                }
+            });
+
+            function showAlert(message, type = 'error') {
+                alertMsg.textContent = message;
+                alertMsg.className = 'alert show ' + type;
+            }
+
+            function hideAlert() {
+                alertMsg.className = 'alert';
+                alertMsg.textContent = '';
+            }
+
+            function showResult(status, message, logs) {
+                resultContainer.classList.add('show');
+                resultStatus.className = 'result-status ' + status;
+                resultStatus.textContent = message;
+                
+                if (logs && logs.trim()) {
+                    let formattedLogs = logs
+                        .replace(/ERROR|❌|خطا/g, '<span class="log-error">$&</span>')
+                        .replace(/SUCCESS|✅|موفق/g, '<span class="log-success">$&</span>')
+                        .replace(/INFO|ℹ️|اطلاعات/g, '<span class="log-info">$&</span>');
+                    resultLogs.innerHTML = formattedLogs;
+                } else {
+                    resultLogs.innerHTML = '<span style="color: #718096;">خروجی خاصی وجود ندارد.</span>';
+                }
+            }
+
+            function hideResult() {
+                resultContainer.classList.remove('show');
+            }
+
+            function setLoading(isLoading) {
+                if (isLoading) {
+                    submitBtn.classList.add('loading');
+                    submitBtn.disabled = true;
+                } else {
+                    submitBtn.classList.remove('loading');
+                    submitBtn.disabled = false;
+                }
+            }
+
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                hideResult();
+                hideAlert();
+
+                const selectedPlatform = platform.value;
+                const codeTypeVal = codeType.value;
+                const token = document.getElementById('tokenInput').value.trim();
+
+                if (!token) {
+                    showAlert('❌ لطفاً توکن ربات را وارد کنید!', 'error');
+                    return;
+                }
+
+                let code = '';
+                let codeSource = '';
+
+                if (codeTypeVal === 'file') {
+                    if (!fileInput.files || fileInput.files.length === 0) {
+                        showAlert('❌ لطفاً یک فایل انتخاب کنید!', 'error');
+                        return;
+                    }
+                    const file = fileInput.files[0];
+                    if (file.size > MAX_FILE_SIZE) {
+                        showAlert('❌ حجم فایل بیشتر از ۱۰۰ کیلوبایت است!', 'error');
+                        return;
+                    }
+                    codeSource = 'فایل: ' + file.name;
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        code = event.target.result;
+                        sendToServer(selectedPlatform, codeTypeVal, token, code, codeSource);
+                    };
+                    reader.onerror = function() {
+                        showAlert('❌ خطا در خواندن فایل!', 'error');
+                    };
+                    reader.readAsText(file, 'UTF-8');
+                    return;
+                } else {
+                    code = codeText.value.trim();
+                    codeSource = 'ورودی متنی';
+                    if (!code) {
+                        showAlert('❌ لطفاً کد را وارد کنید!', 'error');
+                        return;
+                    }
+                    sendToServer(selectedPlatform, codeTypeVal, token, code, codeSource);
+                }
+            });
+
+            async function sendToServer(platform, codeType, token, code, source) {
+                setLoading(true);
+
+                try {
+                    const response = await fetch('/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: new URLSearchParams({
+                            platform: platform,
+                            code_type: codeType,
+                            token: token,
+                            code_text: code
+                        })
+                    });
+
+                    const html = await response.text();
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = html;
+                    
+                    const resultContainer = tempDiv.querySelector('.result-container');
+                    if (resultContainer) {
+                        document.getElementById('resultContainer').innerHTML = resultContainer.innerHTML;
+                        document.getElementById('resultContainer').classList.add('show');
+                    } else {
+                        const alertDiv = tempDiv.querySelector('.alert');
+                        if (alertDiv) {
+                            document.getElementById('alertMessage').innerHTML = alertDiv.innerHTML;
+                            document.getElementById('alertMessage').className = alertDiv.className;
+                        }
+                    }
+
+                } catch (error) {
+                    showAlert('❌ خطا در ارتباط با سرور: ' + error.message, 'error');
+                } finally {
+                    setLoading(false);
+                }
+            }
+        })();
+    </script>
+</body>
+</html>
