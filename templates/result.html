@@ -205,20 +205,17 @@
         </h2>
         
         {% if result %}
-            <!-- ===== وضعیت ===== -->
             <div class="status {% if result.success %}success{% else %}error{% endif %}">
                 {% if result.success %}✅{% else %}❌{% endif %}
                 {{ result.message }}
             </div>
             
-            <!-- ===== پیام تزریق توکن ===== -->
             {% if result.injection_msg %}
                 <div class="info-msg info">
                     🔄 {{ result.injection_msg }}
                 </div>
             {% endif %}
             
-            <!-- ===== آمار ===== -->
             <div class="stats-grid">
                 <div class="stat-item">
                     <div class="label">📱 پلتفرم</div>
@@ -238,7 +235,6 @@
                 </div>
             </div>
             
-            <!-- ===== لاگ‌ها ===== -->
             <div class="logs-box">
                 <div class="title">
                     <span>📋</span>
@@ -250,14 +246,12 @@
                 <pre id="logContent">{% if result.logs %}{{ result.logs }}{% else %}<span style="color: #718096;">خروجی خاصی وجود ندارد.</span>{% endif %}</pre>
             </div>
             
-            <!-- ===== پیام خطا ===== -->
             {% if result.error %}
                 <div class="info-msg error">
                     ❌ {{ result.error }}
                 </div>
             {% endif %}
             
-            <!-- ===== دکمه کپی لاگ ===== -->
             <div style="text-align: left; margin-top: 12px;">
                 <button onclick="copyLogs()" style="
                     background: rgba(255,255,255,0.05);
@@ -274,7 +268,6 @@
             </div>
             
         {% else %}
-            <!-- ===== خطا ===== -->
             <div class="status error">
                 ❌ نتیجه‌ای برای نمایش وجود ندارد.
             </div>
@@ -283,7 +276,6 @@
             </div>
         {% endif %}
         
-        <!-- ===== دکمه بازگشت ===== -->
         <div class="center">
             <a href="/" class="btn-back">
                 🔙 بازگشت به صفحه اصلی
@@ -292,23 +284,19 @@
     </div>
 
     <script>
-        // ===== نمایش زمان اجرا =====
         document.addEventListener('DOMContentLoaded', function() {
             const execTime = document.getElementById('execTime');
             if (execTime) {
                 const startTime = performance.now();
-                // زمان تقریبی از start تا الان
                 const elapsed = Math.round((performance.now() - startTime) / 1000);
                 execTime.textContent = elapsed + ' ثانیه';
             }
         });
 
-        // ===== کپی لاگ‌ها =====
         function copyLogs() {
             const logContent = document.getElementById('logContent');
             if (!logContent) return;
             
-            // گرفتن متن خام (بدون تگ‌های HTML)
             const text = logContent.textContent || logContent.innerText || '';
             
             if (!text || text.trim() === '' || text.trim() === 'خروجی خاصی وجود ندارد.') {
@@ -319,7 +307,6 @@
             navigator.clipboard.writeText(text).then(function() {
                 showToast('✅ لاگ‌ها با موفقیت کپی شدند!', 'success');
             }).catch(function() {
-                // روش جایگزین برای مرورگرهای قدیمی
                 const textarea = document.createElement('textarea');
                 textarea.value = text;
                 document.body.appendChild(textarea);
@@ -334,7 +321,6 @@
             });
         }
 
-        // ===== نمایش توست =====
         function showToast(message, type = 'info') {
             const existingToast = document.querySelector('.toast-message');
             if (existingToast) {
@@ -383,13 +369,11 @@
             }, 3000);
         }
 
-        // ===== رنگ‌آمیزی لاگ‌ها (در صورت نیاز) =====
         document.addEventListener('DOMContentLoaded', function() {
             const logContent = document.getElementById('logContent');
             if (!logContent) return;
             
             let html = logContent.innerHTML;
-            // جایگزینی کلمات کلیدی با رنگ
             html = html
                 .replace(/ERROR|❌|خطا|⚠️|ممنوع|نامعتبر/g, '<span class="log-error">$&</span>')
                 .replace(/SUCCESS|✅|موفق|درست|معتبر|نصب شد/g, '<span class="log-success">$&</span>')
