@@ -45,7 +45,7 @@ try:
 except ImportError:
     print("⚠️ psutil نصب نشد. برخی قابلیت‌ها محدود می‌شوند.")
 
-# ==================== تنظیمات پیش‌فرض (بدون نیاز به input) ====================
+# ==================== تنظیمات پیش‌فرض ====================
 PORT = int(os.environ.get('PORT', 8080))
 MAX_CODE_SIZE = 100 * 1024  # 100 کیلوبایت
 EXECUTION_TIMEOUT = 60  # 60 ثانیه
@@ -346,13 +346,21 @@ def execute_python_code(code, token, platform):
 def index():
     if request.method == 'POST':
         try:
+            # دریافت داده‌ها از فرم
             platform = request.form.get('platform', 'rubika')
             code_type = request.form.get('code_type', 'file')
             token = request.form.get('token', '').strip()
             
+            # لاگ برای دیباگ
+            print(f"📩 دریافت درخواست: platform={platform}, code_type={code_type}, token={token[:10]}...")
+            
+            # اعتبارسنجی توکن
             if not token:
                 return render_template('result.html', 
                     result={'success': False, 'message': '❌ لطفاً توکن را وارد کنید', 'logs': ''})
+            
+            # دریافت کد
+            code_content = ""
             
             if code_type == 'file':
                 if 'code_file' not in request.files:
@@ -371,16 +379,19 @@ def index():
                 
                 try:
                     code_content = file_content.decode('utf-8', errors='ignore')
-                except:
+                    print(f"📄 کد از فایل دریافت شد: {len(code_content)} کاراکتر")
+                except Exception as e:
                     return render_template('result.html', 
-                        result={'success': False, 'message': '❌ فایل معتبر نیست (فقط UTF-8 پشتیبانی می‌شود)', 'logs': ''})
+                        result={'success': False, 'message': f'❌ خطا در خواندن فایل: {str(e)}', 'logs': ''})
                 
-            else:
+            else:  # text
                 code_content = request.form.get('code_text', '').strip()
                 if not code_content:
                     return render_template('result.html', 
                         result={'success': False, 'message': '❌ لطفاً کد را وارد کنید', 'logs': ''})
+                print(f"📄 کد از متن دریافت شد: {len(code_content)} کاراکتر")
             
+            # بررسی اعتبار توکن بر اساس پلتفرم
             token_valid = False
             platform_name = ""
             
@@ -402,15 +413,20 @@ def index():
                     result={'success': False, 'message': f'❌ توکن {platform_name} نامعتبر است!', 
                            'logs': f'لطفاً توکن صحیح را از @BotFather در {platform_name} دریافت کنید'})
             
+            # اجرای کد
+            print("🔄 در حال اجرای کد...")
             result = execute_python_code(code_content, token, platform)
+            print(f"✅ نتیجه: success={result['success']}")
             
             return render_template('result.html', result=result)
             
         except Exception as e:
             import traceback
+            error_msg = traceback.format_exc()
+            print(f"❌ خطا: {error_msg}")
             return render_template('result.html', 
                 result={'success': False, 'message': f'❌ خطای سیستمی: {str(e)}', 
-                       'logs': traceback.format_exc()})
+                       'logs': error_msg})
     
     return render_template('index.html')
 
