@@ -11,6 +11,9 @@ import shutil
 import importlib.util
 import logging
 import traceback
+import asyncio
+from datetime import datetime, timedelta
+import sqlite3
 
 # ==================== تنظیمات لاگ ====================
 logging.basicConfig(
@@ -21,13 +24,18 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+# ==================== تنظیمات ====================
+PORT = int(os.environ.get('PORT', 8080))
+MAX_CODE_SIZE = 200 * 1024
+EXECUTION_TIMEOUT = 120
+
 # ==================== تابع نصب خودکار پکیج‌ها ====================
 def auto_install_packages():
-    required = ['flask', 'requests', 'psutil', 'gunicorn']
+    required = ['flask', 'requests', 'psutil', 'gunicorn', 'python-telegram-bot']
     missing = []
     for pkg in required:
         try:
-            importlib.import_module(pkg)
+            importlib.import_module(pkg.replace('-', '_'))
         except ImportError:
             missing.append(pkg)
     if missing:
@@ -41,33 +49,289 @@ def auto_install_packages():
 
 auto_install_packages()
 
-try:
-    import psutil
-    logger.info("✅ psutil با موفقیت بارگذاری شد")
-except ImportError as e:
-    logger.warning(f"⚠️ psutil نصب نشد: {e}")
+# ==================== کد ربات تلگرام ====================
+TELEGRAM_BOT_CODE = '''
+# -*- coding: utf-8 -*-
+import os
+import sys
+import asyncio
+import logging
+import json
+import time
+import sqlite3
+from datetime import datetime, timedelta
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
-# ==================== تنظیمات پیش‌فرض ====================
-PORT = int(os.environ.get('PORT', 8080))
-MAX_CODE_SIZE = 200 * 1024
-EXECUTION_TIMEOUT = 120
-MASTER_ID = os.environ.get('MASTER_ID', '')
-REPORT_CHAT_ID = os.environ.get('REPORT_CHAT_ID', '')
+# ===== تنظیمات =====
+TOKEN = "YOUR_TOKEN_HERE"
+ADMIN_ID = 123456789  # آیدی عددی ادمین - اینجا مقداردهی کن
 
-logger.info("="*60)
-logger.info("🤖 ربات رانر - راه‌انداز خودکار ربات‌ها")
-logger.info("="*60)
-logger.info(f"📡 پورت: {PORT}")
-logger.info(f"📄 حداکثر حجم فایل: {MAX_CODE_SIZE//1024} KB")
-logger.info(f"⏱️ زمان اجرا: {EXECUTION_TIMEOUT} ثانیه")
-logger.info(f"📱 پلتفرم‌های پشتیبانی‌شده: روبیکا، تلگرام، واتساپ")
-logger.info("="*60)
+# ===== دیتابیس =====
+DB_PATH = "bot_data.db"
+
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT UNIQUE,
+            username TEXT,
+            balance INTEGER DEFAULT 0,
+            is_admin BOOLEAN DEFAULT 0,
+            created_at DATETIME
+        )
+    ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS servers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            plan_name TEXT,
+            storage INTEGER,
+            duration INTEGER,
+            price INTEGER,
+            link_token TEXT UNIQUE,
+            access_code TEXT,
+            expires_at DATETIME,
+            is_active BOOLEAN DEFAULT 1,
+            created_at DATETIME
+        )
+    ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS receipts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            amount INTEGER,
+            receipt_image TEXT,
+            status TEXT DEFAULT 'pending',
+            created_at DATETIME
+        )
+    ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS plans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            storage INTEGER,
+            duration INTEGER,
+            price INTEGER,
+            is_active BOOLEAN DEFAULT 1
+        )
+    ''')
+    
+    # اضافه کردن پلن‌های پیش‌فرض
+    plans = [
+        ('عادی', 1, 1, 2000),
+        ('ویژه', 2, 3, 5000),
+        ('طلایی', 5, 7, 12000),
+        ('الماس', 10, 30, 50000)
+    ]
+    for plan in plans:
+        c.execute('SELECT * FROM plans WHERE name = ?', (plan[0],))
+        if not c.fetchone():
+            c.execute('INSERT INTO plans (name, storage, duration, price, is_active) VALUES (?, ?, ?, ?, ?)',
+                      (plan[0], plan[1], plan[2], plan[3], 1))
+    
+    conn.commit()
+    conn.close()
+
+init_db()
+
+# ===== توابع کمکی =====
+def get_user(user_id):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('SELECT * FROM users WHERE user_id = ?', (str(user_id),))
+    result = c.fetchone()
+    conn.close()
+    return result
+
+def create_user(user_id, username):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('INSERT OR IGNORE INTO users (user_id, username, created_at) VALUES (?, ?, ?)',
+              (str(user_id), username, datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+
+def get_plans():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('SELECT * FROM plans WHERE is_active = 1')
+    result = c.fetchall()
+    conn.close()
+    return result
+
+# ===== دستورات ربات =====
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    create_user(user.id, user.username)
+    
+    keyboard = [
+        [InlineKeyboardButton("🛒 خرید سرور", callback_data="buy_server")],
+        [InlineKeyboardButton("📊 وضعیت سرور من", callback_data="my_servers")],
+        [InlineKeyboardButton("💰 کیف پول من", callback_data="wallet")],
+        [InlineKeyboardButton("📝 اطلاعات کاربری", callback_data="profile")],
+        [InlineKeyboardButton("📞 پشتیبانی", callback_data="support")],
+    ]
+    
+    if str(user.id) == str(ADMIN_ID):
+        keyboard.insert(0, [InlineKeyboardButton("⚙️ پنل مدیریت", callback_data="admin_panel")])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        "🤖 **ربات مدیریت ربات‌ها**\n\n"
+        "سلام! به ربات خوش آمدید.\n"
+        "لطفاً یکی از گزینه‌های زیر را انتخاب کنید:",
+        reply_markup=reply_markup
+    )
+
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = str(update.effective_user.id)
+    data = query.data
+    
+    if data == "buy_server":
+        plans = get_plans()
+        text = "📋 **پلن‌های موجود:**\n\n"
+        keyboard = []
+        
+        for plan in plans:
+            text += f"🔹 {plan[1]} | {plan[2]}GB | {plan[3]} روز | {plan[4]:,} تومان\n"
+            keyboard.append([InlineKeyboardButton(
+                f"🔹 {plan[1]}", 
+                callback_data=f"buy_{plan[0]}"
+            )])
+        
+        keyboard.append([InlineKeyboardButton("⬅️ بازگشت", callback_data="back")])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(text, reply_markup=reply_markup)
+    
+    elif data.startswith("buy_"):
+        plan_id = int(data.split("_")[1])
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('SELECT * FROM plans WHERE id = ?', (plan_id,))
+        plan = c.fetchone()
+        conn.close()
+        
+        if plan:
+            keyboard = [
+                [InlineKeyboardButton("✅ تایید خرید", callback_data=f"confirm_{plan_id}")],
+                [InlineKeyboardButton("❌ انصراف", callback_data="buy_server")],
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                f"📋 **جزئیات پلن {plan[1]}**\n\n"
+                f"💾 حافظه: {plan[2]} GB\n"
+                f"⏰ مدت: {plan[3]} روز\n"
+                f"💰 قیمت: {plan[4]:,} تومان\n\n"
+                f"آیا از خرید این پلن مطمئن هستید؟",
+                reply_markup=reply_markup
+            )
+    
+    elif data == "my_servers":
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('SELECT * FROM servers WHERE user_id = ? AND is_active = 1', (user_id,))
+        servers = c.fetchall()
+        conn.close()
+        
+        if servers:
+            text = "📊 **وضعیت سرورهای شما:**\n\n"
+            for server in servers:
+                expires = datetime.fromisoformat(server[7])
+                remaining = (expires - datetime.now()).days
+                text += f"🔹 **سرور شماره {server[0]}**\n"
+                text += f"├── پلن: {server[2]}\n"
+                text += f"├── حافظه: {server[3]} GB\n"
+                text += f"├── مدت: {server[4]} روز\n"
+                text += f"├── باقی‌مانده: {remaining} روز\n"
+                text += f"└── وضعیت: ✅ فعال\n\n"
+            
+            keyboard = [[InlineKeyboardButton("⬅️ بازگشت", callback_data="back")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, reply_markup=reply_markup)
+        else:
+            await query.edit_message_text(
+                "❌ شما هیچ سرور فعالی ندارید.\n"
+                "از بخش خرید سرور اقدام کنید.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🛒 خرید سرور", callback_data="buy_server")],
+                    [InlineKeyboardButton("⬅️ بازگشت", callback_data="back")]
+                ])
+            )
+    
+    elif data == "wallet":
+        user = get_user(user_id)
+        balance = user[3] if user else 0
+        
+        keyboard = [
+            [InlineKeyboardButton("💰 افزایش موجودی", callback_data="add_balance")],
+            [InlineKeyboardButton("📜 تاریخچه تراکنش‌ها", callback_data="transactions")],
+            [InlineKeyboardButton("⬅️ بازگشت", callback_data="back")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            f"💰 **کیف پول من**\n\n"
+            f"موجودی فعلی: **{balance:,} تومان**",
+            reply_markup=reply_markup
+        )
+    
+    elif data == "profile":
+        user = get_user(user_id)
+        if user:
+            await query.edit_message_text(
+                f"📝 **اطلاعات کاربری**\n\n"
+                f"👤 نام کاربری: @{user[2] or 'نامشخص'}\n"
+                f"🆔 آیدی: {user[1]}\n"
+                f"💰 موجودی: {user[3]:,} تومان\n"
+                f"📅 تاریخ ثبت: {user[5][:10]}\n"
+                f"👑 وضعیت: {'✅ ادمین' if user[4] else 'کاربر عادی'}",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("⬅️ بازگشت", callback_data="back")]
+                ])
+            )
+    
+    elif data == "admin_panel":
+        if str(update.effective_user.id) == str(ADMIN_ID):
+            keyboard = [
+                [InlineKeyboardButton("👤 مدیریت کاربران", callback_data="admin_users")],
+                [InlineKeyboardButton("💰 مدیریت مالی", callback_data="admin_finance")],
+                [InlineKeyboardButton("📩 رسیدها", callback_data="admin_receipts")],
+                [InlineKeyboardButton("⚙️ تنظیمات", callback_data="admin_settings")],
+                [InlineKeyboardButton("⬅️ بازگشت", callback_data="back")],
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(
+                "⚙️ **پنل مدیریت**\n\n"
+                "لطفاً یکی از گزینه‌های زیر را انتخاب کنید:",
+                reply_markup=reply_markup
+            )
+    
+    elif data == "back":
+        await start(update, context)
+
+# ===== راه‌اندازی ربات =====
+def run_telegram_bot():
+    try:
+        app_bot = Application.builder().token(TOKEN).build()
+        
+        app_bot.add_handler(CommandHandler("start", start))
+        app_bot.add_handler(CallbackQueryHandler(button_handler))
+        
+        app_bot.run_polling()
+    except Exception as e:
+        logger.error(f"❌ خطا در اجرای ربات تلگرام: {e}")
+'''
 
 # ==================== توابع بررسی توکن ====================
-
-def check_robika_token(token):
-    logger.info(f"🔍 بررسی توکن روبیکا: {token[:10]}... (بررسی غیرفعال)")
-    return True
 
 def check_telegram_token(token):
     try:
@@ -81,136 +345,47 @@ def check_telegram_token(token):
         logger.error(f"❌ خطا در بررسی توکن تلگرام: {e}")
         return False
 
-def check_whatsapp_token(token):
-    return len(token) > 20
+# ==================== تزریق توکن به کد ربات ====================
 
-# ==================== توابع امنیتی ====================
+def inject_token_to_code(code, token):
+    """تزریق توکن به کد ربات"""
+    modified_code = code.replace("YOUR_TOKEN_HERE", token)
+    return modified_code, f"✅ توکن با موفقیت در کد ربات تزریق شد"
 
-def validate_code_security(code):
-    logger.info("🔍 بررسی امنیتی کد (غیرفعال)")
-    return True, "✅ کد از نظر امنیتی معتبر است"
+# ==================== اجرای ربات ====================
 
-def inject_token_to_code(code, token, platform):
-    """تزریق توکن به کد کاربر"""
-    logger.debug(f"🔄 شروع تزریق توکن به کد (پلتفرم: {platform})...")
+def execute_bot(code, token):
+    """اجرای کد ربات با توکن تزریق شده"""
+    logger.info("🔄 شروع اجرای ربات...")
     
-    modified_code = code
-    modifications = []
+    # تزریق توکن
+    code_with_token, msg = inject_token_to_code(code, token)
     
-    # لیست متغیرهای توکن
-    token_vars = [
-        'TOKEN', 'token', 'YOUR_TOKEN', 'your_token',
-        'BOT_TOKEN', 'bot_token', 'API_TOKEN', 'api_token',
-        'TELEGRAM_TOKEN', 'telegram_token', 'ROBOT_TOKEN', 'robot_token'
-    ]
-    
-    for var in token_vars:
-        if var in modified_code:
-            pattern1 = rf'{var}\s*=\s*["\']([^"\']*)["\']'
-            modified_code = re.sub(pattern1, f'{var} = "{token}"', modified_code)
-            modifications.append(f"جایگزینی {var}")
-    
-    # اگر هیچ تغییری ایجاد نشد، توکن رو به ابتدای کد اضافه کن
-    if not modifications:
-        header = f"""
-# ===== توکن به‌صورت خودکار تزریق شد =====
-TOKEN = "{token}"
-# ============================================
-"""
-        modified_code = header + "\n" + modified_code
-        modifications.append("افزودن توکن در ابتدای کد")
-    
-    logger.debug(f"✅ تزریق توکن انجام شد: {', '.join(modifications)}")
-    return modified_code, f"✅ توکن با موفقیت تزریق شد ({', '.join(modifications)})"
-
-def create_bot_runner_file(code, token, platform):
-    logger.debug("🔄 ایجاد فایل اجرایی ربات...")
-    
-    platform_config = ""
-    if platform == 'rubika':
-        platform_config = f'''
-MASTER_ID = "{MASTER_ID}" if "{MASTER_ID}" else "YOUR_MASTER_ID"
-REPORT_CHAT_ID = "{REPORT_CHAT_ID}" if "{REPORT_CHAT_ID}" else "YOUR_REPORT_CHAT_ID"
-'''
-    elif platform == 'telegram':
-        platform_config = '''
-MASTER_ID = "YOUR_MASTER_ID"
-REPORT_CHAT_ID = "YOUR_REPORT_CHAT_ID"
-'''
-    
-    bot_code = f'''# -*- coding: utf-8 -*-
-import os
-import sys
-import asyncio
-import logging
-import json
-import time
-import sqlite3
-from datetime import datetime
-
-# ===== تنظیمات =====
-{platform_config}
-
-# ===== کد کاربر =====
-{code}
-
-# ===== اجرا =====
-if __name__ == "__main__":
-    try:
-        if 'main' in dir():
-            asyncio.run(main())
-        else:
-            print("⚠️ تابع main پیدا نشد. اجرای مستقیم...")
-    except KeyboardInterrupt:
-        print("🛑 ربات متوقف شد")
-    except Exception as e:
-        print(f"❌ خطا در اجرا: {{e}}")
-        import traceback
-        traceback.print_exc()
-'''
-    
-    logger.debug(f"✅ فایل اجرایی با {len(bot_code)} کاراکتر ایجاد شد")
-    return bot_code
-
-def execute_python_code(code, token, platform):
-    logger.info("🔄 شروع اجرای کد...")
-    
-    is_valid, msg = validate_code_security(code)
-    if not is_valid:
-        return {'success': False, 'message': msg, 'logs': '', 'error': msg}
-    
-    code_with_token, injection_msg = inject_token_to_code(code, token, platform)
-    full_code = create_bot_runner_file(code_with_token, token, platform)
-    
+    # ایجاد فایل موقت
     temp_dir = tempfile.mkdtemp()
     temp_path = os.path.join(temp_dir, "bot_runner.py")
     
     try:
         with open(temp_path, 'w', encoding='utf-8') as f:
-            f.write(full_code)
+            f.write(code_with_token)
         logger.info(f"✅ فایل در {temp_path} ذخیره شد")
     except Exception as e:
         shutil.rmtree(temp_dir, ignore_errors=True)
-        return {'success': False, 'message': f'❌ خطا در ایجاد فایل: {str(e)}', 'logs': str(e), 'error': str(e)}
+        return {'success': False, 'message': f'❌ خطا در ایجاد فایل: {str(e)}', 'logs': str(e)}
     
-    # ===== نصب پکیج rubika (پکیج اصلی) =====
+    # نصب پکیج مورد نیاز
     install_logs = ""
-    
     try:
-        logger.info(f"📦 نصب پکیج: rubika")
         install_result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "rubika", "--quiet"],
+            [sys.executable, "-m", "pip", "install", "python-telegram-bot", "--quiet"],
             capture_output=True, text=True, timeout=60
         )
         if install_result.returncode != 0:
-            install_logs = f"⚠️ خطا در نصب rubika: {install_result.stderr[:200]}\n"
-            logger.warning(install_logs)
+            install_logs = f"⚠️ خطا در نصب python-telegram-bot\n"
         else:
-            install_logs = f"✅ rubika نصب شد.\n"
-            logger.info(f"✅ rubika نصب شد")
+            install_logs = f"✅ python-telegram-bot نصب شد.\n"
     except Exception as e:
         install_logs = f"⚠️ خطا در نصب: {str(e)}\n"
-        logger.error(install_logs)
     
     # اجرای کد
     output = ""
@@ -220,15 +395,7 @@ def execute_python_code(code, token, platform):
     
     try:
         env = os.environ.copy()
-        env["TOKEN"] = token
         env["PYTHONUNBUFFERED"] = "1"
-        env["PYTHONIOENCODING"] = "utf-8"
-        if MASTER_ID:
-            env["MASTER_ID"] = MASTER_ID
-        if REPORT_CHAT_ID:
-            env["REPORT_CHAT_ID"] = REPORT_CHAT_ID
-        
-        logger.info(f"🚀 اجرای کد با پایتون: {sys.executable}")
         
         process = subprocess.Popen(
             [sys.executable, temp_path],
@@ -245,58 +412,34 @@ def execute_python_code(code, token, platform):
             if not success and stderr:
                 error_msg = stderr[:500]
                 logger.error(f"❌ خطای اجرا: {error_msg}")
-            elif not success and not stderr:
-                error_msg = "❌ کد با خطای ناشناخته متوقف شد"
-                logger.error(error_msg)
                 
         except subprocess.TimeoutExpired:
-            logger.warning(f"⏰ زمان اجرا بیش از حد مجاز ({EXECUTION_TIMEOUT} ثانیه)")
-            try:
-                if 'psutil' in sys.modules:
-                    parent = psutil.Process(process.pid)
-                    children = parent.children(recursive=True)
-                    for child in children:
-                        child.kill()
-                    parent.kill()
-                else:
-                    process.kill()
-            except:
-                process.kill()
+            process.kill()
             output = f"⏰ زمان اجرا بیش از حد مجاز ({EXECUTION_TIMEOUT} ثانیه)\n"
             success = False
             error_msg = "Timeout"
             
-    except FileNotFoundError:
-        output = "❌ پایتون روی سرور نصب نیست!"
-        success = False
-        error_msg = "Python not found"
     except Exception as e:
         output = f"❌ خطا در اجرا: {str(e)}"
         success = False
         error_msg = str(e)
         logger.error(f"❌ خطا در اجرا: {e}")
-        logger.error(traceback.format_exc())
     finally:
         try:
             if process and process.poll() is None:
                 process.kill()
             shutil.rmtree(temp_dir, ignore_errors=True)
-            logger.debug("🧹 فایل‌های موقت پاکسازی شدند")
         except:
             pass
     
     full_output = install_logs + output if install_logs else output
     
-    result = {
+    return {
         'success': success,
         'message': '✅ ربات با موفقیت اجرا شد!' if success else f'❌ خطا در اجرا: {error_msg}',
         'logs': full_output,
-        'injection_msg': injection_msg,
         'error': error_msg if not success else ''
     }
-    
-    logger.info(f"🏁 نتیجه اجرا: success={success}")
-    return result
 
 # ==================== مسیرهای سایت ====================
 
@@ -304,14 +447,14 @@ def execute_python_code(code, token, platform):
 def index():
     if request.method == 'POST':
         try:
-            platform = request.form.get('platform', 'rubika')
-            code_type = request.form.get('code_type', 'file')
             token = request.form.get('token', '').strip()
+            code_type = request.form.get('code_type', 'file')
             
             if not token:
                 return render_template('result.html', 
                     result={'success': False, 'message': '❌ لطفاً توکن را وارد کنید', 'logs': ''})
             
+            # دریافت کد
             code_content = ""
             
             if code_type == 'file':
@@ -336,24 +479,13 @@ def index():
                         result={'success': False, 'message': '❌ لطفاً کد را وارد کنید', 'logs': ''})
             
             # بررسی توکن
-            token_valid = True
-            platform_name = "روبیکا"
-            
-            if platform == 'rubika':
-                token_valid = check_robika_token(token)
-            elif platform == 'telegram':
-                token_valid = check_telegram_token(token)
-                platform_name = "تلگرام"
-            elif platform == 'whatsapp':
-                token_valid = check_whatsapp_token(token)
-                platform_name = "واتساپ"
-            
-            if not token_valid and platform not in ['other', 'whatsapp']:
+            if not check_telegram_token(token):
                 return render_template('result.html', 
-                    result={'success': False, 'message': f'❌ توکن {platform_name} نامعتبر است!', 
-                           'logs': f'لطفاً توکن صحیح را از @BotFather در {platform_name} دریافت کنید'})
+                    result={'success': False, 'message': '❌ توکن تلگرام نامعتبر است!', 
+                           'logs': 'لطفاً توکن صحیح را از @BotFather دریافت کنید'})
             
-            result = execute_python_code(code_content, token, platform)
+            # اجرای ربات
+            result = execute_bot(code_content, token)
             return render_template('result.html', result=result)
             
         except Exception as e:
@@ -379,14 +511,17 @@ def server_error(e):
         result={'success': False, 'message': '❌ خطای داخلی سرور', 'logs': str(e)}), 500
 
 if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8080))
+    if port is None or port == 0:
+        port = 8080
     print("\n" + "="*60)
-    print("🤖 ربات رانر - راه‌انداز خودکار ربات‌ها")
+    print("🤖 ربات رانر - راه‌انداز ربات تلگرام")
     print("="*60)
-    print(f"📡 پورت: {PORT}")
+    print(f"📡 پورت: {port}")
     print(f"📄 حداکثر حجم فایل: {MAX_CODE_SIZE//1024} KB")
     print(f"⏱️ زمان اجرا: {EXECUTION_TIMEOUT} ثانیه")
-    print(f"📱 پلتفرم‌های پشتیبانی‌شده: روبیکا، تلگرام، واتساپ")
+    print(f"📱 پلتفرم پشتیبانی‌شده: تلگرام")
     print("="*60)
-    print("🌐 آدرس: http://localhost:" + str(PORT))
+    print("🌐 آدرس: http://localhost:" + str(port))
     print("="*60 + "\n")
-    app.run(host='0.0.0.0', port=PORT, debug=False, threaded=True)
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
