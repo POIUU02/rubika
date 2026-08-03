@@ -19,8 +19,9 @@ import signal
 app = Flask(__name__)
 
 PORT = int(os.environ.get('PORT', 8080))
-MAX_CODE_SIZE = 500 * 1024
-EXECUTION_TIMEOUT = 99999999999999999999999999999999999999999999999999999999999999999
+MAX_CODE_SIZE = 500 * 1024  # 500 کیلوبایت
+# ===== بدون محدودیت زمانی =====
+EXECUTION_TIMEOUT = None  # None یعنی نامحدود
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -33,7 +34,7 @@ def check_telegram_token(token):
     """بررسی اعتبار توکن تلگرام"""
     try:
         url = f"https://api.telegram.org/bot{token}/getMe"
-        resp = requests.get(url, timeout=5)
+        resp = requests.get(url, timeout=10)
         if resp.status_code == 200:
             return resp.json().get('ok', False)
         return False
@@ -42,7 +43,7 @@ def check_telegram_token(token):
         return False
 
 # ============================================================
-# ===== تابع تشخیص و نصب همه وابستگی‌های تلگرام =====
+# ===== تابع تشخیص و نصب همه وابستگی‌ها =====
 # ============================================================
 
 def detect_and_install_dependencies(code):
@@ -72,7 +73,6 @@ def detect_and_install_dependencies(code):
         'mysql-connector-python': 'mysql-connector-python',
         'psycopg2': 'psycopg2-binary',
         'aiohttp': 'aiohttp',
-        'asyncio': '',  # داخلی
         'websockets': 'websockets',
         'flask': 'flask',
         'django': 'django',
@@ -132,12 +132,12 @@ def detect_and_install_dependencies(code):
     return install_logs
 
 # ============================================================
-# ===== تابع اصلی: اجرای کد کاربر با توکن خودش =====
+# ===== تابع اصلی: اجرای کد کاربر با توکن خودش (نامحدود) =====
 # ============================================================
 
 def execute_user_bot(user_code, user_token):
     """
-    این تابع کد کاربر رو میگیره، توکنش رو توش جایگذاری میکنه و اجراش میکنه
+    این تابع کد کاربر رو میگیره، توکنش رو توش جایگذاری میکنه و بدون محدودیت زمانی اجراش میکنه
     """
     logger.info(f"🔄 شروع اجرای ربات کاربر با توکن: {user_token[:10]}...")
     
@@ -167,7 +167,7 @@ def execute_user_bot(user_code, user_token):
     # ===== مرحله ۳: نصب وابستگی‌ها =====
     install_logs = detect_and_install_dependencies(modified_code)
     
-    # ===== مرحله ۴: اجرای کد کاربر =====
+    # ===== مرحله ۴: اجرای کد کاربر (بدون محدودیت زمانی) =====
     output = ""
     success = False
     error_msg = ""
@@ -178,7 +178,7 @@ def execute_user_bot(user_code, user_token):
         env["PYTHONUNBUFFERED"] = "1"
         env["TOKEN"] = user_token
         
-        logger.info(f"🚀 اجرای کد کاربر...")
+        logger.info(f"🚀 اجرای کد کاربر (بدون محدودیت زمانی)...")
         
         process = subprocess.Popen(
             [sys.executable, temp_path],
@@ -189,6 +189,7 @@ def execute_user_bot(user_code, user_token):
             cwd=temp_dir
         )
         
+        # ===== بدون timeout =====
         stdout, stderr = process.communicate()
         output = stdout + stderr
         success = process.returncode == 0
@@ -207,6 +208,7 @@ def execute_user_bot(user_code, user_token):
         try:
             if process and process.poll() is None:
                 process.kill()
+            # فایل‌های موقت رو پاک نمیکنیم تا ربات به کار خودش ادامه بده
         except:
             pass
     
@@ -257,11 +259,13 @@ def index():
                     return render_template('result.html', 
                         result={'success': False, 'message': '❌ لطفاً کد را وارد کنید', 'logs': ''})
             
+            # بررسی توکن
             if not check_telegram_token(token):
                 return render_template('result.html', 
                     result={'success': False, 'message': '❌ توکن تلگرام نامعتبر است!', 
                            'logs': 'لطفاً توکن صحیح را از @BotFather دریافت کنید'})
             
+            # اجرای کد کاربر با توکن خودش (نامحدود)
             result = execute_user_bot(code_content, token)
             return render_template('result.html', result=result)
             
@@ -289,10 +293,11 @@ def server_error(e):
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     print("\n" + "="*60)
-    print("🤖 ربات رانر - اجرای کد کاربر با توکن خودش")
+    print("🤖 ربات رانر - اجرای کد کاربر با توکن خودش (نامحدود)")
     print("="*60)
     print(f"📡 پورت: {port}")
     print("🌐 آدرس: http://localhost:" + str(port))
+    print("⏱️ زمان اجرا: ♾️ نامحدود")
     print("📦 پشتیبانی از همه وابستگی‌های تلگرام")
     print("="*60 + "\n")
     app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
