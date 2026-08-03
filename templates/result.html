@@ -210,16 +210,10 @@
                 {{ result.message }}
             </div>
             
-            {% if result.injection_msg %}
-                <div class="info-msg info">
-                    🔄 {{ result.injection_msg }}
-                </div>
-            {% endif %}
-            
             <div class="stats-grid">
                 <div class="stat-item">
                     <div class="label">📱 پلتفرم</div>
-                    <div class="value">{{ request.form.get('platform', 'نامشخص') }}</div>
+                    <div class="value">تلگرام</div>
                 </div>
                 <div class="stat-item">
                     <div class="label">📄 نوع ورودی</div>
