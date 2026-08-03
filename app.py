@@ -26,83 +26,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# ===== کد ربات ادمین (برای خود شما) =====
-# ============================================================
-ADMIN_BOT_CODE = '''
-import os
-import sys
-import time
-import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
-
-TOKEN = "8262116870:AAGhf7siH7qpVm4nPAM8kGJcPwgyu0PZZFo"
-ADMIN_ID = 6443963679
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if str(user.id) != str(ADMIN_ID):
-        await update.message.reply_text("❌ شما دسترسی به این ربات ندارید!")
-        return
-    
-    keyboard = [
-        [InlineKeyboardButton("👤 مدیریت کاربران", callback_data="users")],
-        [InlineKeyboardButton("💰 مدیریت مالی", callback_data="finance")],
-        [InlineKeyboardButton("📩 رسیدها", callback_data="receipts")],
-        [InlineKeyboardButton("⚙️ تنظیمات", callback_data="settings")],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(
-        "⚙️ **پنل مدیریت**\n\n"
-        "به پنل مدیریت خوش آمدید!",
-        reply_markup=reply_markup
-    )
-
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user = update.effective_user
-    
-    if str(user.id) != str(ADMIN_ID):
-        await query.edit_message_text("❌ شما دسترسی ندارید!")
-        return
-    
-    data = query.data
-    if data == "users":
-        await query.edit_message_text("👤 **مدیریت کاربران**\n\nدر حال توسعه...")
-    elif data == "finance":
-        await query.edit_message_text("💰 **مدیریت مالی**\n\nدر حال توسعه...")
-    elif data == "receipts":
-        await query.edit_message_text("📩 **رسیدها**\n\nدر حال توسعه...")
-    elif data == "settings":
-        await query.edit_message_text("⚙️ **تنظیمات**\n\nدر حال توسعه...")
-
-def run_admin_bot():
-    while True:
-        try:
-            logger.info("🚀 ربات ادمین شروع به کار کرد...")
-            app = Application.builder().token(TOKEN).build()
-            app.add_handler(CommandHandler("start", start))
-            app.add_handler(CallbackQueryHandler(button_handler))
-            app.run_polling()
-        except Exception as e:
-            logger.error(f"❌ خطا در ربات ادمین: {e}")
-            time.sleep(5)
-
-if __name__ == "__main__":
-    run_admin_bot()
-'''
-
-# ============================================================
-# ===== کد ربات کاربر (برای هر کاربر) =====
+# ===== تابع ساخت کد ربات کاربر =====
 # ============================================================
 def create_user_bot_code(user_code, user_token):
-    """ساخت کد ربات برای کاربر با توکن خودش"""
-    return f'''
-import os
+    """ساخت کد کامل ربات برای کاربر با توکن خودش"""
+    return f'''import os
 import sys
 import time
 import logging
@@ -122,8 +50,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
-        "🤖 **ربات شما**\n\n"
-        "سلام! به ربات خود خوش آمدید.",
+        "🤖 **ربات شما**\\n\\nسلام! به ربات خود خوش آمدید.",
         reply_markup=reply_markup
     )
 
@@ -132,11 +59,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     data = query.data
     if data == "buy":
-        await query.edit_message_text("🛒 **خرید سرور**\n\nبه زودی...")
+        await query.edit_message_text("🛒 **خرید سرور**\\n\\nبه زودی...")
     elif data == "status":
-        await query.edit_message_text("📊 **وضعیت**\n\nدر حال توسعه...")
+        await query.edit_message_text("📊 **وضعیت**\\n\\nدر حال توسعه...")
     elif data == "wallet":
-        await query.edit_message_text("💰 **کیف پول**\n\nدر حال توسعه...")
+        await query.edit_message_text("💰 **کیف پول**\\n\\nدر حال توسعه...")
 
 def run_user_bot():
     while True:
@@ -159,7 +86,6 @@ if __name__ == "__main__":
 # ============================================================
 
 def check_telegram_token(token):
-    """بررسی اعتبار توکن تلگرام"""
     try:
         url = f"https://api.telegram.org/bot{token}/getMe"
         resp = requests.get(url, timeout=5)
@@ -170,7 +96,6 @@ def check_telegram_token(token):
         return False
 
 def execute_bot(code, token):
-    """اجرای ربات کاربر با توکن خودش"""
     logger.info(f"🔄 شروع اجرای ربات کاربر با توکن: {token[:10]}...")
     
     # ساخت کد کامل ربات با توکن کاربر
@@ -194,7 +119,7 @@ def execute_bot(code, token):
     except:
         install_logs = "⚠️ خطا در نصب python-telegram-bot\n"
     
-    # اجرای ربات (بدون محدودیت زمانی)
+    # اجرای ربات
     output = ""
     success = False
     error_msg = ""
@@ -282,13 +207,11 @@ def index():
                     return render_template('result.html', 
                         result={'success': False, 'message': '❌ لطفاً کد را وارد کنید', 'logs': ''})
             
-            # بررسی اعتبار توکن
             if not check_telegram_token(token):
                 return render_template('result.html', 
                     result={'success': False, 'message': '❌ توکن تلگرام نامعتبر است!', 
                            'logs': 'لطفاً توکن صحیح را از @BotFather دریافت کنید'})
             
-            # اجرای ربات کاربر
             result = execute_bot(code_content, token)
             return render_template('result.html', result=result)
             
