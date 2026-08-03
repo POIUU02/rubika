@@ -42,6 +42,66 @@ def check_telegram_token(token):
         return False
 
 # ============================================================
+# ===== تابع تشخیص و نصب وابستگی‌ها =====
+# ============================================================
+
+def detect_and_install_dependencies(code):
+    """تشخیص و نصب خودکار وابستگی‌های مورد نیاز کد"""
+    install_logs = ""
+    
+    # لیست وابستگی‌های رایج
+    common_deps = {
+        'telegram': 'python-telegram-bot',
+        'rubika': 'rubika',
+        'requests': 'requests',
+        'jdatetime': 'jdatetime',
+        'sqlite3': '',  # داخلی
+        'json': '',  # داخلی
+        'os': '',  # داخلی
+        'sys': '',  # داخلی
+        'time': '',  # داخلی
+        'datetime': '',  # داخلی
+        'asyncio': '',  # داخلی
+        'logging': '',  # داخلی
+        're': '',  # داخلی
+        'random': '',  # داخلی
+        'string': '',  # داخلی
+        'hashlib': '',  # داخلی
+        'base64': '',  # داخلی
+    }
+    
+    # تشخیص پکیج‌های مورد نیاز
+    deps_to_install = []
+    
+    for keyword, package in common_deps.items():
+        if package and (keyword in code.lower()):
+            # بررسی اینکه پکیج نصب هست یا نه
+            try:
+                importlib.import_module(package.replace('-', '_'))
+            except ImportError:
+                deps_to_install.append(package)
+    
+    # نصب پکیج‌ها
+    for dep in deps_to_install:
+        try:
+            logger.info(f"📦 نصب وابستگی: {dep}")
+            result = subprocess.run(
+                [sys.executable, "-m", "pip", "install", dep, "--quiet"],
+                capture_output=True, text=True, timeout=60
+            )
+            if result.returncode == 0:
+                install_logs += f"✅ {dep} نصب شد.\n"
+                logger.info(f"✅ {dep} نصب شد")
+            else:
+                install_logs += f"⚠️ خطا در نصب {dep}\n"
+                logger.warning(f"⚠️ خطا در نصب {dep}")
+        except Exception as e:
+            install_logs += f"⚠️ خطا در نصب {dep}: {str(e)}\n"
+            logger.error(f"❌ خطا در نصب {dep}: {e}")
+    
+    return install_logs
+
+# ============================================================
 # ===== تابع اصلی: اجرای کد کاربر با توکن خودش =====
 # ============================================================
 
@@ -52,17 +112,13 @@ def execute_user_bot(user_code, user_token):
     logger.info(f"🔄 شروع اجرای ربات کاربر با توکن: {user_token[:10]}...")
     
     # ===== مرحله ۱: تزریق توکن کاربر به کد خودش =====
-    # جایگزینی تمام متغیرهای احتمالی توکن با توکن کاربر
     token_vars = ['TOKEN', 'token', 'YOUR_TOKEN', 'your_token', 'BOT_TOKEN', 'bot_token']
     
     modified_code = user_code
     for var in token_vars:
-        # جایگزینی TOKEN = "..." با توکن جدید
         modified_code = re.sub(rf'{var}\s*=\s*["\']([^"\']*)["\']', f'{var} = "{user_token}"', modified_code)
-        # جایگزینی TOKEN = '...' با توکن جدید
         modified_code = re.sub(rf'{var}\s*=\s*\'([^\']*)\'', f'{var} = "{user_token}"', modified_code)
     
-    # اگر هیچ تغییری ایجاد نشد، توکن رو به ابتدای کد اضافه کن
     if 'TOKEN' not in modified_code and 'token' not in modified_code:
         modified_code = f'TOKEN = "{user_token}"\n\n' + modified_code
     
@@ -78,31 +134,8 @@ def execute_user_bot(user_code, user_token):
         shutil.rmtree(temp_dir, ignore_errors=True)
         return {'success': False, 'message': f'❌ خطا در ذخیره کد: {str(e)}', 'logs': str(e)}
     
-    # ===== مرحله ۳: نصب وابستگی‌های احتمالی =====
-    install_logs = ""
-    
-    # بررسی وابستگی‌های رایج
-    dependencies = []
-    if 'import telegram' in modified_code or 'from telegram' in modified_code:
-        dependencies.append('python-telegram-bot')
-    if 'import rubika' in modified_code or 'from rubika' in modified_code:
-        dependencies.append('rubika')
-    if 'import requests' in modified_code:
-        dependencies.append('requests')
-    
-    for dep in dependencies:
-        try:
-            logger.info(f"📦 نصب وابستگی: {dep}")
-            result = subprocess.run(
-                [sys.executable, "-m", "pip", "install", dep, "--quiet"],
-                capture_output=True, text=True, timeout=60
-            )
-            if result.returncode == 0:
-                install_logs += f"✅ {dep} نصب شد.\n"
-            else:
-                install_logs += f"⚠️ خطا در نصب {dep}\n"
-        except Exception as e:
-            install_logs += f"⚠️ خطا در نصب {dep}: {str(e)}\n"
+    # ===== مرحله ۳: تشخیص و نصب وابستگی‌ها =====
+    install_logs = detect_and_install_dependencies(modified_code)
     
     # ===== مرحله ۴: اجرای کد کاربر =====
     output = ""
@@ -126,7 +159,6 @@ def execute_user_bot(user_code, user_token):
             cwd=temp_dir
         )
         
-        # اجرا بدون محدودیت زمانی (تا زمانی که ربات روشنه)
         stdout, stderr = process.communicate()
         output = stdout + stderr
         success = process.returncode == 0
@@ -145,8 +177,6 @@ def execute_user_bot(user_code, user_token):
         try:
             if process and process.poll() is None:
                 process.kill()
-            # فایل‌های موقت رو پاک نکنید تا ربات به کار خودش ادامه بده
-            # shutil.rmtree(temp_dir, ignore_errors=True)
         except:
             pass
     
@@ -197,13 +227,11 @@ def index():
                     return render_template('result.html', 
                         result={'success': False, 'message': '❌ لطفاً کد را وارد کنید', 'logs': ''})
             
-            # بررسی توکن
             if not check_telegram_token(token):
                 return render_template('result.html', 
                     result={'success': False, 'message': '❌ توکن تلگرام نامعتبر است!', 
                            'logs': 'لطفاً توکن صحیح را از @BotFather دریافت کنید'})
             
-            # اجرای کد کاربر با توکن خودش
             result = execute_user_bot(code_content, token)
             return render_template('result.html', result=result)
             
