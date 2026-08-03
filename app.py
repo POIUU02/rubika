@@ -26,100 +26,85 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# ===== تابع ساخت کد ربات کاربر =====
-# ============================================================
-def create_user_bot_code(user_code, user_token):
-    """ساخت کد کامل ربات برای کاربر با توکن خودش"""
-    return f'''import os
-import sys
-import time
-import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
-
-TOKEN = "{user_token}"
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("🛒 خرید سرور", callback_data="buy")],
-        [InlineKeyboardButton("📊 وضعیت", callback_data="status")],
-        [InlineKeyboardButton("💰 کیف پول", callback_data="wallet")],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(
-        "🤖 **ربات شما**\\n\\nسلام! به ربات خود خوش آمدید.",
-        reply_markup=reply_markup
-    )
-
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    data = query.data
-    if data == "buy":
-        await query.edit_message_text("🛒 **خرید سرور**\\n\\nبه زودی...")
-    elif data == "status":
-        await query.edit_message_text("📊 **وضعیت**\\n\\nدر حال توسعه...")
-    elif data == "wallet":
-        await query.edit_message_text("💰 **کیف پول**\\n\\nدر حال توسعه...")
-
-def run_user_bot():
-    while True:
-        try:
-            logger.info("🚀 ربات کاربر شروع به کار کرد...")
-            app = Application.builder().token(TOKEN).build()
-            app.add_handler(CommandHandler("start", start))
-            app.add_handler(CallbackQueryHandler(button_handler))
-            app.run_polling()
-        except Exception as e:
-            logger.error(f"❌ خطا در ربات کاربر: {{e}}")
-            time.sleep(5)
-
-if __name__ == "__main__":
-    run_user_bot()
-'''
-
-# ============================================================
-# ===== توابع اصلی سایت =====
+# ===== تابع بررسی توکن =====
 # ============================================================
 
 def check_telegram_token(token):
+    """بررسی اعتبار توکن تلگرام"""
     try:
         url = f"https://api.telegram.org/bot{token}/getMe"
         resp = requests.get(url, timeout=5)
         if resp.status_code == 200:
             return resp.json().get('ok', False)
         return False
-    except:
+    except Exception as e:
+        logger.error(f"❌ خطا در بررسی توکن: {e}")
         return False
 
-def execute_bot(code, token):
-    logger.info(f"🔄 شروع اجرای ربات کاربر با توکن: {token[:10]}...")
+# ============================================================
+# ===== تابع اصلی: اجرای کد کاربر با توکن خودش =====
+# ============================================================
+
+def execute_user_bot(user_code, user_token):
+    """
+    این تابع کد کاربر رو میگیره، توکنش رو توش جایگذاری میکنه و اجراش میکنه
+    """
+    logger.info(f"🔄 شروع اجرای ربات کاربر با توکن: {user_token[:10]}...")
     
-    # ساخت کد کامل ربات با توکن کاربر
-    full_code = create_user_bot_code(code, token)
+    # ===== مرحله ۱: تزریق توکن کاربر به کد خودش =====
+    # جایگزینی تمام متغیرهای احتمالی توکن با توکن کاربر
+    token_vars = ['TOKEN', 'token', 'YOUR_TOKEN', 'your_token', 'BOT_TOKEN', 'bot_token']
     
+    modified_code = user_code
+    for var in token_vars:
+        # جایگزینی TOKEN = "..." با توکن جدید
+        modified_code = re.sub(rf'{var}\s*=\s*["\']([^"\']*)["\']', f'{var} = "{user_token}"', modified_code)
+        # جایگزینی TOKEN = '...' با توکن جدید
+        modified_code = re.sub(rf'{var}\s*=\s*\'([^\']*)\'', f'{var} = "{user_token}"', modified_code)
+    
+    # اگر هیچ تغییری ایجاد نشد، توکن رو به ابتدای کد اضافه کن
+    if 'TOKEN' not in modified_code and 'token' not in modified_code:
+        modified_code = f'TOKEN = "{user_token}"\n\n' + modified_code
+    
+    # ===== مرحله ۲: ذخیره کد در فایل موقت =====
     temp_dir = tempfile.mkdtemp()
-    temp_path = os.path.join(temp_dir, "bot_runner.py")
+    temp_path = os.path.join(temp_dir, "user_bot.py")
     
     try:
         with open(temp_path, 'w', encoding='utf-8') as f:
-            f.write(full_code)
+            f.write(modified_code)
+        logger.info(f"✅ کد کاربر در {temp_path} ذخیره شد")
     except Exception as e:
         shutil.rmtree(temp_dir, ignore_errors=True)
-        return {'success': False, 'message': f'❌ خطا: {str(e)}', 'logs': str(e)}
+        return {'success': False, 'message': f'❌ خطا در ذخیره کد: {str(e)}', 'logs': str(e)}
     
-    # نصب پکیج
+    # ===== مرحله ۳: نصب وابستگی‌های احتمالی =====
     install_logs = ""
-    try:
-        subprocess.run([sys.executable, "-m", "pip", "install", "python-telegram-bot", "--quiet"], capture_output=True, text=True, timeout=60)
-        install_logs = "✅ python-telegram-bot نصب شد.\n"
-    except:
-        install_logs = "⚠️ خطا در نصب python-telegram-bot\n"
     
-    # اجرای ربات
+    # بررسی وابستگی‌های رایج
+    dependencies = []
+    if 'import telegram' in modified_code or 'from telegram' in modified_code:
+        dependencies.append('python-telegram-bot')
+    if 'import rubika' in modified_code or 'from rubika' in modified_code:
+        dependencies.append('rubika')
+    if 'import requests' in modified_code:
+        dependencies.append('requests')
+    
+    for dep in dependencies:
+        try:
+            logger.info(f"📦 نصب وابستگی: {dep}")
+            result = subprocess.run(
+                [sys.executable, "-m", "pip", "install", dep, "--quiet"],
+                capture_output=True, text=True, timeout=60
+            )
+            if result.returncode == 0:
+                install_logs += f"✅ {dep} نصب شد.\n"
+            else:
+                install_logs += f"⚠️ خطا در نصب {dep}\n"
+        except Exception as e:
+            install_logs += f"⚠️ خطا در نصب {dep}: {str(e)}\n"
+    
+    # ===== مرحله ۴: اجرای کد کاربر =====
     output = ""
     success = False
     error_msg = ""
@@ -128,6 +113,9 @@ def execute_bot(code, token):
     try:
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"
+        env["TOKEN"] = user_token
+        
+        logger.info(f"🚀 اجرای کد کاربر...")
         
         process = subprocess.Popen(
             [sys.executable, temp_path],
@@ -138,6 +126,7 @@ def execute_bot(code, token):
             cwd=temp_dir
         )
         
+        # اجرا بدون محدودیت زمانی (تا زمانی که ربات روشنه)
         stdout, stderr = process.communicate()
         output = stdout + stderr
         success = process.returncode == 0
@@ -147,7 +136,7 @@ def execute_bot(code, token):
             logger.error(f"❌ خطای اجرا: {error_msg}")
             
     except Exception as e:
-        output = f"❌ خطا: {str(e)}"
+        output = f"❌ خطا در اجرا: {str(e)}"
         success = False
         error_msg = str(e)
         logger.error(f"❌ خطا در اجرا: {e}")
@@ -156,7 +145,8 @@ def execute_bot(code, token):
         try:
             if process and process.poll() is None:
                 process.kill()
-            shutil.rmtree(temp_dir, ignore_errors=True)
+            # فایل‌های موقت رو پاک نکنید تا ربات به کار خودش ادامه بده
+            # shutil.rmtree(temp_dir, ignore_errors=True)
         except:
             pass
     
@@ -207,12 +197,14 @@ def index():
                     return render_template('result.html', 
                         result={'success': False, 'message': '❌ لطفاً کد را وارد کنید', 'logs': ''})
             
+            # بررسی توکن
             if not check_telegram_token(token):
                 return render_template('result.html', 
                     result={'success': False, 'message': '❌ توکن تلگرام نامعتبر است!', 
                            'logs': 'لطفاً توکن صحیح را از @BotFather دریافت کنید'})
             
-            result = execute_bot(code_content, token)
+            # اجرای کد کاربر با توکن خودش
+            result = execute_user_bot(code_content, token)
             return render_template('result.html', result=result)
             
         except Exception as e:
@@ -239,10 +231,10 @@ def server_error(e):
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     print("\n" + "="*60)
-    print("🤖 ربات رانر - اجرای ربات کاربران")
+    print("🤖 ربات رانر - اجرای کد کاربر با توکن خودش")
     print("="*60)
     print(f"📡 پورت: {port}")
     print("🌐 آدرس: http://localhost:" + str(port))
-    print("💡 هر کاربر با توکن خودش رباتش رو اجرا میکنه!")
+    print("💡 کاربر کد و توکن خودش رو قرار میده و ربات خودش اجرا میشه!")
     print("="*60 + "\n")
     app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
