@@ -11,9 +11,8 @@ import shutil
 import importlib.util
 import logging
 import traceback
-import asyncio
-from datetime import datetime, timedelta
 import sqlite3
+from datetime import datetime
 
 # ==================== تنظیمات لاگ ====================
 logging.basicConfig(
@@ -65,7 +64,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Mess
 
 # ===== تنظیمات =====
 TOKEN = "YOUR_TOKEN_HERE"
-ADMIN_ID = 123456789  # آیدی عددی ادمین - اینجا مقداردهی کن
+ADMIN_ID = 123456789
 
 # ===== دیتابیس =====
 DB_PATH = "bot_data.db"
@@ -119,7 +118,6 @@ def init_db():
         )
     ''')
     
-    # اضافه کردن پلن‌های پیش‌فرض
     plans = [
         ('عادی', 1, 1, 2000),
         ('ویژه', 2, 3, 5000),
@@ -137,7 +135,6 @@ def init_db():
 
 init_db()
 
-# ===== توابع کمکی =====
 def get_user(user_id):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -162,7 +159,6 @@ def get_plans():
     conn.close()
     return result
 
-# ===== دستورات ربات =====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     create_user(user.id, user.username)
@@ -318,14 +314,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "back":
         await start(update, context)
 
-# ===== راه‌اندازی ربات =====
 def run_telegram_bot():
     try:
         app_bot = Application.builder().token(TOKEN).build()
-        
         app_bot.add_handler(CommandHandler("start", start))
         app_bot.add_handler(CallbackQueryHandler(button_handler))
-        
         app_bot.run_polling()
     except Exception as e:
         logger.error(f"❌ خطا در اجرای ربات تلگرام: {e}")
@@ -348,20 +341,16 @@ def check_telegram_token(token):
 # ==================== تزریق توکن به کد ربات ====================
 
 def inject_token_to_code(code, token):
-    """تزریق توکن به کد ربات"""
     modified_code = code.replace("YOUR_TOKEN_HERE", token)
     return modified_code, f"✅ توکن با موفقیت در کد ربات تزریق شد"
 
 # ==================== اجرای ربات ====================
 
 def execute_bot(code, token):
-    """اجرای کد ربات با توکن تزریق شده"""
     logger.info("🔄 شروع اجرای ربات...")
     
-    # تزریق توکن
     code_with_token, msg = inject_token_to_code(code, token)
     
-    # ایجاد فایل موقت
     temp_dir = tempfile.mkdtemp()
     temp_path = os.path.join(temp_dir, "bot_runner.py")
     
@@ -373,7 +362,6 @@ def execute_bot(code, token):
         shutil.rmtree(temp_dir, ignore_errors=True)
         return {'success': False, 'message': f'❌ خطا در ایجاد فایل: {str(e)}', 'logs': str(e)}
     
-    # نصب پکیج مورد نیاز
     install_logs = ""
     try:
         install_result = subprocess.run(
@@ -387,7 +375,6 @@ def execute_bot(code, token):
     except Exception as e:
         install_logs = f"⚠️ خطا در نصب: {str(e)}\n"
     
-    # اجرای کد
     output = ""
     success = False
     error_msg = ""
@@ -454,7 +441,6 @@ def index():
                 return render_template('result.html', 
                     result={'success': False, 'message': '❌ لطفاً توکن را وارد کنید', 'logs': ''})
             
-            # دریافت کد
             code_content = ""
             
             if code_type == 'file':
@@ -478,13 +464,11 @@ def index():
                     return render_template('result.html', 
                         result={'success': False, 'message': '❌ لطفاً کد را وارد کنید', 'logs': ''})
             
-            # بررسی توکن
             if not check_telegram_token(token):
                 return render_template('result.html', 
                     result={'success': False, 'message': '❌ توکن تلگرام نامعتبر است!', 
                            'logs': 'لطفاً توکن صحیح را از @BotFather دریافت کنید'})
             
-            # اجرای ربات
             result = execute_bot(code_content, token)
             return render_template('result.html', result=result)
             
