@@ -42,58 +42,88 @@ def check_telegram_token(token):
         return False
 
 # ============================================================
-# ===== تابع تشخیص و نصب وابستگی‌ها =====
+# ===== تابع تشخیص و نصب همه وابستگی‌های تلگرام =====
 # ============================================================
 
 def detect_and_install_dependencies(code):
-    """تشخیص و نصب خودکار وابستگی‌های مورد نیاز کد"""
+    """تشخیص و نصب خودکار همه وابستگی‌های مورد نیاز کد"""
     install_logs = ""
     
-    # لیست وابستگی‌های رایج
-    common_deps = {
+    # ===== لیست کامل وابستگی‌های تلگرام و پکیج‌های مرتبط =====
+    all_deps = {
+        # کتابخانه‌های اصلی تلگرام
+        'telebot': 'pyTelegramBotAPI',
+        'pyTelegramBotAPI': 'pyTelegramBotAPI',
         'telegram': 'python-telegram-bot',
+        'python-telegram-bot': 'python-telegram-bot',
+        
+        # کتابخانه‌های روبیکا
         'rubika': 'rubika',
+        'rubka': 'rubika',
+        
+        # کتابخانه‌های عمومی
         'requests': 'requests',
         'jdatetime': 'jdatetime',
-        'sqlite3': '',  # داخلی
-        'json': '',  # داخلی
-        'os': '',  # داخلی
-        'sys': '',  # داخلی
-        'time': '',  # داخلی
-        'datetime': '',  # داخلی
+        'persiantools': 'persiantools',
+        'python-dotenv': 'python-dotenv',
+        'sqlalchemy': 'sqlalchemy',
+        'redis': 'redis',
+        'pymongo': 'pymongo',
+        'mysql-connector-python': 'mysql-connector-python',
+        'psycopg2': 'psycopg2-binary',
+        'aiohttp': 'aiohttp',
         'asyncio': '',  # داخلی
-        'logging': '',  # داخلی
-        're': '',  # داخلی
-        'random': '',  # داخلی
-        'string': '',  # داخلی
-        'hashlib': '',  # داخلی
-        'base64': '',  # داخلی
+        'websockets': 'websockets',
+        'flask': 'flask',
+        'django': 'django',
+        'fastapi': 'fastapi',
+        'uvicorn': 'uvicorn',
+        
+        # کتابخانه‌های پردازش
+        'pandas': 'pandas',
+        'numpy': 'numpy',
+        'matplotlib': 'matplotlib',
+        'pillow': 'pillow',
+        'opencv': 'opencv-python',
+        
+        # کتابخانه‌های امنیتی
+        'cryptography': 'cryptography',
+        'pycryptodome': 'pycryptodome',
+        'jwt': 'pyjwt',
+        
+        # کتابخانه‌های کاربردی
+        'beautifulsoup4': 'beautifulsoup4',
+        'selenium': 'selenium',
+        'scrapy': 'scrapy',
+        'lxml': 'lxml',
     }
     
-    # تشخیص پکیج‌های مورد نیاز
+    # ===== تشخیص پکیج‌های مورد نیاز از کد =====
     deps_to_install = []
+    code_lower = code.lower()
     
-    for keyword, package in common_deps.items():
-        if package and (keyword in code.lower()):
+    for keyword, package in all_deps.items():
+        if package and keyword in code_lower:
             # بررسی اینکه پکیج نصب هست یا نه
             try:
                 importlib.import_module(package.replace('-', '_'))
             except ImportError:
-                deps_to_install.append(package)
+                if package not in deps_to_install:
+                    deps_to_install.append(package)
     
-    # نصب پکیج‌ها
+    # ===== نصب پکیج‌ها =====
     for dep in deps_to_install:
         try:
             logger.info(f"📦 نصب وابستگی: {dep}")
             result = subprocess.run(
                 [sys.executable, "-m", "pip", "install", dep, "--quiet"],
-                capture_output=True, text=True, timeout=60
+                capture_output=True, text=True, timeout=120
             )
             if result.returncode == 0:
                 install_logs += f"✅ {dep} نصب شد.\n"
                 logger.info(f"✅ {dep} نصب شد")
             else:
-                install_logs += f"⚠️ خطا در نصب {dep}\n"
+                install_logs += f"⚠️ خطا در نصب {dep}: {result.stderr[:100]}\n"
                 logger.warning(f"⚠️ خطا در نصب {dep}")
         except Exception as e:
             install_logs += f"⚠️ خطا در نصب {dep}: {str(e)}\n"
@@ -112,7 +142,7 @@ def execute_user_bot(user_code, user_token):
     logger.info(f"🔄 شروع اجرای ربات کاربر با توکن: {user_token[:10]}...")
     
     # ===== مرحله ۱: تزریق توکن کاربر به کد خودش =====
-    token_vars = ['TOKEN', 'token', 'YOUR_TOKEN', 'your_token', 'BOT_TOKEN', 'bot_token']
+    token_vars = ['TOKEN', 'token', 'YOUR_TOKEN', 'your_token', 'BOT_TOKEN', 'bot_token', 'API_TOKEN', 'api_token']
     
     modified_code = user_code
     for var in token_vars:
@@ -134,7 +164,7 @@ def execute_user_bot(user_code, user_token):
         shutil.rmtree(temp_dir, ignore_errors=True)
         return {'success': False, 'message': f'❌ خطا در ذخیره کد: {str(e)}', 'logs': str(e)}
     
-    # ===== مرحله ۳: تشخیص و نصب وابستگی‌ها =====
+    # ===== مرحله ۳: نصب وابستگی‌ها =====
     install_logs = detect_and_install_dependencies(modified_code)
     
     # ===== مرحله ۴: اجرای کد کاربر =====
@@ -263,6 +293,6 @@ if __name__ == '__main__':
     print("="*60)
     print(f"📡 پورت: {port}")
     print("🌐 آدرس: http://localhost:" + str(port))
-    print("💡 کاربر کد و توکن خودش رو قرار میده و ربات خودش اجرا میشه!")
+    print("📦 پشتیبانی از همه وابستگی‌های تلگرام")
     print("="*60 + "\n")
     app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
