@@ -20,7 +20,7 @@ app = Flask(__name__)
 
 PORT = int(os.environ.get('PORT', 8080))
 MAX_CODE_SIZE = 500 * 1024
-EXECUTION_TIMEOUT = 999999
+EXECUTION_TIMEOUT = 99999999999999999999999999999999999999999999999999999999999999999
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
