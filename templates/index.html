@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🚀 راه‌انداز سریع ربات</title>
+    <title>🚀 راه‌انداز ربات تلگرام</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -295,28 +295,18 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🤖 راه‌انداز فوری ربات</h1>
-            <p>کد ربات خود را آپلود کنید، ما اجرا می‌کنیم!</p>
+            <h1>🤖 راه‌انداز ربات تلگرام</h1>
+            <p>کد ربات خود را آپلود کنید و اجرا کنید!</p>
         </div>
 
         <div class="alert" id="alertMessage"></div>
 
         <form id="mainForm" novalidate>
             <div class="form-group">
-                <label>📱 پلتفرم ربات:</label>
-                <select class="form-control" id="platform" name="platform" required>
-                    <option value="rubika">روبیکا</option>
-                    <option value="telegram">تلگرام</option>
-                    <option value="whatsapp">واتساپ</option>
-                    <option value="other">سایر</option>
-                </select>
-            </div>
-
-            <div class="form-group">
                 <label>📄 نوع کد:</label>
                 <select class="form-control" id="codeType" name="code_type" required>
                     <option value="file">📁 آپلود فایل (پایتون)</option>
-                    <option value="text">✏️ وارد کردن متن کد</option>
+                    <option value="text">✏️ چسباندن کد</option>
                 </select>
             </div>
 
@@ -333,12 +323,12 @@
             </div>
 
             <div class="form-group" id="textInputGroup" style="display: none;">
-                <label>✏️ کد پایتون:</label>
-                <textarea class="form-control" id="codeText" name="code_text" placeholder="# کد خود را اینجا بنویسید..." rows="8"></textarea>
+                <label>✏️ کد ربات تلگرام:</label>
+                <textarea class="form-control" id="codeText" name="code_text" placeholder="# کد ربات خود را اینجا بچسبانید..." rows="10"></textarea>
             </div>
 
             <div class="form-group">
-                <label>🔑 توکن ربات:</label>
+                <label>🔑 توکن ربات تلگرام:</label>
                 <input class="form-control" id="tokenInput" type="text" name="token" placeholder="توکن خود را از @BotFather دریافت کنید" required>
                 <small style="color: #718096; display: block; margin-top: 6px; font-size: 12px;">
                     مثال: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
@@ -355,7 +345,7 @@
             <p>
                 ⚡ کد شما در محیط امن اجرا می‌شود.<br>
                 🔒 لاگ‌ها و خطاها به شما نمایش داده می‌شوند.<br>
-                ⏱️ زمان اجرا حداکثر ۶۰ ثانیه.
+                ⏱️ زمان اجرا حداکثر ۱۲۰ ثانیه.
             </p>
         </div>
 
@@ -386,7 +376,6 @@
             const resultContainer = document.getElementById('resultContainer');
             const resultStatus = document.getElementById('resultStatus');
             const resultLogs = document.getElementById('resultLogs');
-            const platform = document.getElementById('platform');
 
             const MAX_FILE_SIZE = 100 * 1024;
 
@@ -493,14 +482,14 @@
                 hideResult();
                 hideAlert();
 
-                const selectedPlatform = platform.value;
-                const codeTypeVal = codeType.value;
                 const token = document.getElementById('tokenInput').value.trim();
 
                 if (!token) {
                     showAlert('❌ لطفاً توکن ربات را وارد کنید!', 'error');
                     return;
                 }
+
+                const codeTypeVal = codeType.value;
 
                 if (codeTypeVal === 'file') {
                     if (!fileInput.files || fileInput.files.length === 0) {
@@ -515,7 +504,7 @@
                     const reader = new FileReader();
                     reader.onload = function(event) {
                         const code = event.target.result;
-                        sendToServer(selectedPlatform, codeTypeVal, token, code);
+                        sendToServer(token, codeTypeVal, code);
                     };
                     reader.onerror = function() {
                         showAlert('❌ خطا در خواندن فایل!', 'error');
@@ -527,18 +516,17 @@
                         showAlert('❌ لطفاً کد را وارد کنید!', 'error');
                         return;
                     }
-                    sendToServer(selectedPlatform, codeTypeVal, token, code);
+                    sendToServer(token, codeTypeVal, code);
                 }
             });
 
-            async function sendToServer(platform, codeType, token, code) {
+            async function sendToServer(token, codeType, code) {
                 setLoading(true);
 
                 try {
                     const formData = new FormData();
-                    formData.append('platform', platform);
-                    formData.append('code_type', codeType);
                     formData.append('token', token);
+                    formData.append('code_type', codeType);
                     formData.append('code_text', code);
 
                     const response = await fetch('/', {
