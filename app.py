@@ -864,10 +864,10 @@ def create_user(username, password, storage_limit, expiry_days, max_connections=
     link_token = generate_link_token()
     hashed_pw = hash_password(password)
     expires_at = (datetime.now() + timedelta(days=expiry_days)).isoformat() if expiry_days > 0 else None
-    db_execute('''
+    db_execute("""
         INSERT INTO users (username, password, link_token, storage_limit, max_connections, expiry_days, expires_at, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (username, hashed_pw, link_token, storage_limit, max_connections, expiry_days, expires_at, datetime.now().isoformat()))
+    """, (username, hashed_pw, link_token, storage_limit, max_connections, expiry_days, expires_at, datetime.now().isoformat()))
     return db_execute_one('SELECT id FROM users WHERE username = ?', (username,))
 
 def ikb(rows):
